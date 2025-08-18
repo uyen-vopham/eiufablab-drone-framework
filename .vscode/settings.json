@@ -71,7 +71,8 @@
         "future": "cpp",
         "semaphore": "cpp",
         "shared_mutex": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "strstream": "cpp"
     },
     "python.autoComplete.extraPaths": [
         "/home/uyen/Drone/drone_ws/install/takeoff_srv/local/lib/python3.10/dist-packages",

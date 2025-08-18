@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
     auto node = std::make_shared<OffboardControl>();
 
     // Instead of spin, use a custom executor
-    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::executors::MultiThreadedExecutor exec;
     exec.add_node(node);
     exec.spin();
 
