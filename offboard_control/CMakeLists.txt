@@ -15,6 +15,8 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+# find_package(GeographicLib REQUIRED)
+
 
 add_executable(offboard_node
   src/offboard_control.cpp
@@ -31,6 +33,12 @@ add_executable(waypoints_node
 add_executable(offboard_server_node
   src/offboard_control_server.cpp
 )
+
+add_executable(process_waypoint_node
+  src/process_waypoint.cpp
+)
+
+target_link_libraries(process_waypoint_node Geographic)
 
 ament_target_dependencies(offboard_node
   rclcpp
@@ -73,6 +81,18 @@ ament_target_dependencies(offboard_server_node
   std_srvs
 )
 
+ament_target_dependencies(process_waypoint_node
+  rclcpp
+  geometry_msgs
+  mavros_msgs
+  nav_msgs
+  tf2_ros
+  visualization_msgs
+  std_srvs
+  tf2
+  # GeographicLib
+)
+
 target_include_directories(offboard_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
@@ -93,13 +113,23 @@ target_include_directories(offboard_server_node
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
   $<INSTALL_INTERFACE:include/offboard_control>)
 
+target_include_directories(process_waypoint_node
+  PUBLIC 
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
+  $<INSTALL_INTERFACE:include/offboard_control>)
+
 install(TARGETS
   offboard_node
   marker_node
   waypoints_node
   offboard_server_node
+  process_waypoint_node
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install (DIRECTORY launch
+DESTINATION share/${PROJECT_NAME})
+
 
 
 ament_package()

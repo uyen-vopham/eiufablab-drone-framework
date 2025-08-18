@@ -10,6 +10,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
                                                               reach_attitude_(false),
                                                               landing_flag_(false),
                                                               pull_waypoint_srv_flag(false),
+                                                              process_srv_flag(false),
                                                               takeoff_start_time_(this->now()), 
                                                               takeoff_delay_(rclcpp::Duration::from_seconds(5.0))
 {
@@ -61,10 +62,6 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
         "mavros/local_position/pose", qos_pose, 
         std::bind(&OffboardControl::position_cb, this, _1)
     );
-    waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
-        "mavros/mission/waypoints", qos_waypoint,
-        std::bind(&OffboardControl::waypoint_cb, this, _1)
-    );
 
     //-------------Publisher------------
     setpoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
@@ -83,8 +80,9 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
     set_mode_client_ = this->create_client<mavros_msgs::srv::SetMode>("mavros/set_mode");
     //landing client
     landing_client_ = this->create_client<mavros_msgs::srv::SetMode>("mavros/set_mode");
-    //pull waypoin client
-    pull_waypoint_client_ = this ->create_client<mavros_msgs::srv::WaypointPull>("mavros/mission/pull");
+    //process waypoint client
+    process_wp_client_ = this->create_client<std_srvs::srv::SetBool>("process_waypoint_service");
+
     
     //--------------------Timer callback----------------
     timer_ = this->create_wall_timer(
@@ -131,6 +129,28 @@ void OffboardControl::state_cb(const mavros_msgs::msg::State msg) {
     }
 }
 
+void OffboardControl::process_wp (){
+    if (process_srv_flag){
+        return;
+    }
+    RCLCPP_INFO(this->get_logger(), "Requesting to process waypoints...");
+    if (!process_wp_client_->wait_for_service(std::chrono::seconds(2))) {
+        RCLCPP_ERROR(this->get_logger(), "Process waypoints service not available");
+        return;
+    }
+    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = true;
+
+    auto future = process_wp_client_->async_send_request(request,
+        std::bind(&OffboardControl::process_wp_cb, this, std::placeholders::_1));
+    
+    process_srv_flag = true;
+}
+
+void OffboardControl::process_wp_cb(rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture future){
+
+}
+
 void OffboardControl::position_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){ 
     last_pose_time_ = this->now();
     current_x_ = msg->pose.position.x;
@@ -143,46 +163,6 @@ void OffboardControl::position_cb(const geometry_msgs::msg::PoseStamped::SharedP
         attitude_reach_time_=this->now();
         RCLCPP_INFO(this->get_logger(), "✅ Target altitude reached, starting countdown...");
     }
-}
-
-void OffboardControl::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg){
-    // RCLCPP_INFO(this->get_logger(), "Received %ld waypoints", msg->waypoints.size());
-    RCLCPP_INFO(this->get_logger(), "YOU ARE IN WAYPOINT CALLBACK");
-    RCLCPP_INFO(this->get_logger(),
-        "Got %zu waypoints, current waypoint seq: %u",
-        msg->waypoints.size(), msg->current_seq);
-    std::ofstream file ("/home/uyen/Drone/drone_ws/src/offboard_control/src/waypoint_log.csv", std::ios::trunc);
-    if (!file.is_open()){
-        RCLCPP_ERROR(this->get_logger(), "❌ Cannot open waypoints_log.csv");
-        return;
-    }
-    if (file.is_open()){RCLCPP_INFO(this->get_logger(), "FILE IS OPENEDDDDDDDDDDDDDDDD");}
-    // std::string name = "uyen";
-    // int age = 29;
-    // file << name << "," << age << "\n";
-    for (size_t i = 0; i < msg->waypoints.size(); i++)
-    {
-        const auto &wp = msg->waypoints[i];
-        RCLCPP_INFO(this->get_logger(),
-            "WP[%zu] frame=%d command=%d is_current=%d "
-            "lat=%.9f lon=%.9f alt=%.9f",
-            i,
-            wp.frame,
-            wp.command,
-            wp.is_current,
-            wp.x_lat,
-            wp.y_long,
-            wp.z_alt
-        );
-        file << std::fixed << std::setprecision(10)
-            << i << ","
-            << wp.x_lat << ","
-            << wp.y_long << ","
-            << wp.z_alt << "\n";
-    }
-    file.close();
-    std::cout << "✅ CSV written successfully.\n";
-    return;
 }
 
 void OffboardControl::arm_drone(){
@@ -258,41 +238,6 @@ void OffboardControl::disarm_cb(rclcpp::Client<mavros_msgs::srv::CommandBool>::S
     }
 }
 
-void OffboardControl::pull_waypoint(){
-    if (pull_waypoint_srv_flag){
-        // RCLCPP_INFO(this->get_logger(), "❎ Drone is already send client to pull waypoint.");
-        return; 
-    }
-    if (!pull_waypoint_client_->wait_for_service(std::chrono::seconds(2))){
-        RCLCPP_WARN(this->get_logger(), "Waypoint pull service not available");
-        return;
-    }
-    auto pull_request_ = std::make_shared<mavros_msgs::srv::WaypointPull::Request>();
-    auto future = pull_waypoint_client_->async_send_request(pull_request_,
-        std::bind(&OffboardControl::pull_waypoint_cb, this, std::placeholders::_1));
-    RCLCPP_INFO(this->get_logger(), "PULLED");
-    pull_waypoint_srv_flag = true;
-}
-
-void OffboardControl::pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future){
-    try
-    {
-        auto response = future.get();
-        if (response->success)
-        {
-            RCLCPP_INFO(this->get_logger(),
-                "Successfully pulled %u waypoints from FCU", response->wp_received);
-        }
-        else
-        {
-            RCLCPP_WARN(this->get_logger(), "Failed to pull mission waypoints from FCU");
-        }
-    }
-    catch (const std::exception &e)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
-    }
-}
 void OffboardControl::go_ahead(){
     target_pose.header.stamp = this->now(); 
     target_pose.header.frame_id = "map";
@@ -373,8 +318,9 @@ void OffboardControl::main_loop() {
     /////////////////////////////////////
 
     if (!landing_flag_ && takeoff_flag){
+        process_wp();
         arm_drone();
-        pull_waypoint();
+        // pull_waypoint();
         takeoff();
     }
 

@@ -83,8 +83,6 @@ OffboardControl::OffboardControl(): Node("offboard_control"),
     );
 
     //--------------Initial other functions-----------------
-    timer_csv = this->create_wall_timer(std::chrono::milliseconds(100), 
-                                        std::bind(&OffboardControl::log_position, this));
     csv_start_ = this->now();
 }
 
@@ -137,9 +135,7 @@ void OffboardControl::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPt
         return;
     }
     if (file.is_open()){RCLCPP_INFO(this->get_logger(), "FILE IS OPENEDDDDDDDDDDDDDDDD");}
-    // std::string name = "uyen";
-    // int age = 29;
-    // file << name << "," << age << "\n";
+
     for (size_t i = 0; i < msg->waypoints.size(); i++)
     {
         const auto &wp = msg->waypoints[i];
@@ -155,7 +151,6 @@ void OffboardControl::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPt
             wp.z_alt
         );
         file << std::fixed << std::setprecision(10)
-            << i << ","
             << wp.x_lat << ","
             << wp.y_long << ","
             << wp.z_alt << "\n";
@@ -325,6 +320,37 @@ void OffboardControl::landing_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::Shar
     }
 }
 
+void OffboardControl::follow_trajectory(const std::string& csv_to_read_path)
+{
+    std::ifstream file (csv_to_read_path);
+    std::cout<<csv_to_read_path<<std::endl;
+    if (!file.is_open()){
+        std::cout<<"ERROR: Can not open csv file"<< std::endl;
+        // RCLCPP_ERROR(this->get_logger(), "❌ Cannot open waypoints_log.csv");
+        return;
+    }
+    if (file.is_open()){
+        std::cout<<"INFO: CSV file is open, and ready to transfer."<<std::endl;}
+    
+    std::string line;
+    while(std::getline(file, line))
+    {
+        std::stringstream single_stream_(line);
+        std::string token;
+        std::vector<double> values;
+        while(std::getline(single_stream_, token, ','))
+        {
+        values.push_back(std::stod(token));
+        target_pose.pose.position.x = values[0];
+        target_pose.pose.position.y = values[1];
+        target_pose.pose.position.z = values[2];
+        }
+        setpoint_pub_->publish(target_pose);
+        
+    }
+    
+}
+
 void OffboardControl::main_loop() {
 
     // If this is the first time the timer runs → start the delay countdown
@@ -385,29 +411,7 @@ void OffboardControl::main_loop() {
         
 }
 
-void OffboardControl::log_position(){
-    double elapsed_time = (this->now() - csv_start_).seconds();
-    try
-    {
-        std::ofstream file("drone_log_position.csv", std::ios::app);
-        if (!file.is_open())
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to open CSV file: %s", "drone_log_position.csv" );
-            return;
-        }
 
-        file << std::fixed << std::setprecision(2)
-             << elapsed_time << ","
-             << current_x_ << ","
-             << current_y_ << ","
-             << current_z_ << "\n";
-        file.close();
-    }
-    catch (const std::exception &e)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to write to CSV: %s", e.what());
-    }
-}
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
