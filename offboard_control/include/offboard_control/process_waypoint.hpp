@@ -20,9 +20,6 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "tf2_ros/transform_broadcaster.h"
-#include "visualization_msgs/msg/marker.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 
 #include "std_srvs/srv/set_bool.hpp"
@@ -31,7 +28,10 @@
 #include "mavros_msgs/srv/waypoint_pull.hpp"
 #include "GeographicLib/LocalCartesian.hpp"
 
-#include "/home/uyen/Drone/drone_ws/src/offboard_control/include/offboard_control/offboard_control.hpp"
+//#include "/home/uyen/Drone/drone_ws/src/offboard_control/include/offboard_control/offboard_control.hpp"
+
+#include "offboard_control/offboard_control.hpp"
+
 
 using namespace std::chrono_literals;
 

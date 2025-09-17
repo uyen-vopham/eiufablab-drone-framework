@@ -1,4 +1,4 @@
-#include "process_waypoint.hpp"
+#include "offboard_control/process_waypoint.hpp"
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -80,7 +80,7 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
 {
     recieved_rq = true;
     // response -> success = true;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming PROCESS WAYPOINT request");
     recieved_rq = true;
     if (pull_waypoint_srv_flag & write_transfer_wp_flag)
     {response -> success = true;
@@ -96,6 +96,7 @@ void ProcessWaypointNode::pull_waypoint(){
         // RCLCPP_INFO(this->get_logger(), "❎ Drone is already send client to pull waypoint.");
         return; 
     }
+    
     if (!pull_waypoint_client_->wait_for_service(std::chrono::seconds(2))){
         RCLCPP_WARN(this->get_logger(), "Waypoint pull service not available");
         return;

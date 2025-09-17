@@ -1,17 +1,18 @@
-#include "drone_transformation.hpp"
+#include "offboard_control/drone_transformation.hpp"
 
 using std::placeholders::_1;
 using std::placeholders::_2;
 #include <functional> 
 
-DroneTransformation::DroneTransformation():Node("drone_transformation_node"),
+DroneTransformation::DroneTransformation():Node("drone_transformation_node")
                                                                             
 {
     
     //-----------------STATIC TRANSFORM----------------
+    static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
     static_transform_.header.stamp = this->get_clock()->now();
-    static_transform_.header.frame_id = "drone_base";
-    static_transform_.child_frame_id = "drone_top";
+    static_transform_.header.frame_id = "base_link";
+    static_transform_.child_frame_id = "drone_footprint";
 
     static_transform_.transform.translation.x = 0.0;
     static_transform_.transform.translation.y = 0.0;
@@ -27,7 +28,7 @@ DroneTransformation::DroneTransformation():Node("drone_transformation_node"),
     <<static_transform_.header.frame_id <<" and " <<static_transform_.child_frame_id);
 
     //----------------DYNAMIC TRANSFORM
-
+    dynamic_tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
     //--------------QoS-------------------
     //----DRONE POSE
     rclcpp::QoS qos_pose(rclcpp::KeepLast(10));
@@ -41,31 +42,31 @@ DroneTransformation::DroneTransformation():Node("drone_transformation_node"),
         std::bind(&DroneTransformation::position_cb, this, _1)
     );
 
-    last_x = last_y = last_z = 0.0;
+    //--------------Timer-----------------
+    timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(100),
+        std::bind(&DroneTransformation::main_loop, this)
+    );
 
 }
 
-// void DroneTransformation::position_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
-//     dynamic_transform_.header.stamp = this->get_clock()->now();
-//     dynamic_transform_.header.frame_id = 'odom';
-//     dynamic_transform_.child_frame_id = 'drone_base';
-
-
-
-// }
-
-void DroneTransformation::dynamic_transformation(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
+void DroneTransformation::position_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
     dynamic_transform_.header.stamp = this->get_clock()->now();
-    dynamic_transform_.header.frame_id = 'odom';
-    dynamic_transform_.child_frame_id = 'drone_base';
-    dynamic_transform_.transform.translation.x = last_x + msg->pose.position.x;
-    dynamic_transform_.transform.translation.y = last_y + msg->pose.position.y;
-    dynamic_transform_.transform.translation.z = last_z + msg->pose.position.z;
+    dynamic_transform_.header.frame_id = "world";
+    dynamic_transform_.child_frame_id = "base_link";
+    dynamic_transform_.transform.translation.x = msg->pose.position.x;
+    dynamic_transform_.transform.translation.y = msg->pose.position.y;
+    dynamic_transform_.transform.translation.z = msg->pose.position.z;
+    dynamic_transform_.transform.rotation = msg->pose.orientation;
 
+    dynamic_tf_broadcaster_->sendTransform(dynamic_transform_);
+
+    // RCLCPP_INFO(rclcpp::get_logger("Transform"), "Translation z is %f", msg->pose.position.z);
 }
 
-
-
+void DroneTransformation::main_loop(){
+    // dynamic_transformation();
+}
 
 
 

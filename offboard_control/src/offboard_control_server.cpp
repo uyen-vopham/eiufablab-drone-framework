@@ -1,4 +1,4 @@
-#include "offboard_control.hpp"
+#include "offboard_control/offboard_control.hpp"
 
 
 using std::placeholders::_1;
@@ -9,6 +9,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
                                                               check_armed_(false),
                                                               reach_attitude_(false),
                                                               landing_flag_(false),
+                                                              offboard_mode(false),
                                                               pull_waypoint_srv_flag(false),
                                                               process_srv_flag(false),
                                                               takeoff_start_time_(this->now()), 
@@ -70,7 +71,9 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
 
 
     //---------------Service Server--------------
-    service_ = this-> create_service <std_srvs::srv::SetBool>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
+    service_ = this-> create_service <custom_msgs::srv::ModeSignal>("offboard_service", 
+                                    std::bind(&OffboardControl::service_callback, this, _1, _2), 
+                                    rmw_qos_profile_services_default,callback_group_);
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
 
   
@@ -97,13 +100,18 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
 }
 
 
-void OffboardControl::service_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
-          std::shared_ptr<std_srvs::srv::SetBool::Response>      response)
+void OffboardControl::service_callback(const std::shared_ptr<custom_msgs::srv::ModeSignal::Request> request,
+          std::shared_ptr<custom_msgs::srv::ModeSignal::Response>      response)
 {
-    response -> success = true;
+    if (request->mode == custom_msgs::srv::ModeSignal::Request::OFFBOARD)
+    {
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
+    this->set_mode_offboard();
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response ");
+    response -> accepted = true;
     takeoff_flag = true;
+    return;
+    }
 }
 
 void OffboardControl::state_cb(const mavros_msgs::msg::State msg) {
@@ -119,7 +127,7 @@ void OffboardControl::state_cb(const mavros_msgs::msg::State msg) {
         landing_flag_=false;
     }
     if (current_state_.mode == "AUTO.LAND"){
-        landing_flag_ = true;
+        // landing_flag_ = true;
         offboard_flag = false;
         RCLCPP_INFO(this->get_logger(), "AUTO.LAND MODE");
     }
@@ -127,6 +135,40 @@ void OffboardControl::state_cb(const mavros_msgs::msg::State msg) {
     if (current_state_.mode == "STABILIZED"){
         offboard_flag = true;
     }
+}
+
+void OffboardControl::set_mode_offboard(){
+    RCLCPP_INFO(this->get_logger(), "Requesting to OFFBOARD mode ..");
+    if (offboard_mode){return;}
+    if (!set_mode_client_->wait_for_service(std::chrono::seconds(2))) {
+        RCLCPP_ERROR(this->get_logger(), "SETMODE service not available");
+        return;
+    }
+    auto request = std::make_shared<mavros_msgs::srv::SetMode::Request>();
+    request->custom_mode = "OFFBOARD";
+
+    auto future = set_mode_client_->async_send_request(request,
+        std::bind(&OffboardControl::set_mode_offboard_cb, this, std::placeholders::_1));
+}
+
+void OffboardControl::set_mode_offboard_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::SharedFuture future){
+    try
+    {
+        auto response = future.get();
+
+        if (response->mode_sent){
+            RCLCPP_INFO(this->get_logger(), "Mode changed!");
+            // check_armed_=true;
+            // pull_waypoint_srv_flag = true;
+            // pull_waypoint();
+            offboard_mode = true;
+        }
+        else  {RCLCPP_WARN(this->get_logger(), "Failed to Arm Drone!");}
+
+    }catch (const std::exception &e)
+    {
+        RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
+    } 
 }
 
 void OffboardControl::process_wp (){
@@ -148,7 +190,23 @@ void OffboardControl::process_wp (){
 }
 
 void OffboardControl::process_wp_cb(rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture future){
+    try
+    {
+        auto response_process_wq = future.get();
 
+        if (response_process_wq->success)
+        {
+            RCLCPP_INFO(this->get_logger(), "✅ Recieving transfer waypoints successfully.");
+        }
+        else
+        {
+            RCLCPP_WARN(this->get_logger(), "❌ PROCESS WAYPOINTS request sent but failed.");
+        }
+    }
+    catch (const std::exception &e)
+    {
+        RCLCPP_ERROR(this->get_logger(), "❌ Error receiving PROCESS WAYPOINTS response: %s", e.what());
+    }
 }
 
 void OffboardControl::position_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg){ 
@@ -252,7 +310,7 @@ void OffboardControl::takeoff(){
     target_pose.header.frame_id = "map";
     target_pose.pose.position.x = 0.0;
     target_pose.pose.position.y = 0.0;
-    target_pose.pose.position.z = 7.0;
+    target_pose.pose.position.z = 10.0;
     setpoint_pub_->publish(target_pose);
 }
 
@@ -284,7 +342,6 @@ void OffboardControl::landing_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::Shar
         else {
             RCLCPP_WARN(this->get_logger(), "Failed to set AUTO.LAND mode");
         }
-
     } catch (const std::exception &e) {
         RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
     }
@@ -324,7 +381,7 @@ void OffboardControl::main_loop() {
         takeoff();
     }
 
-    if (!reach_attitude_ && (this->now() - takeoff_start_time_) > rclcpp::Duration(30s)){
+    if (!reach_attitude_ && (this->now() - takeoff_start_time_) > rclcpp::Duration(50s)){
         RCLCPP_ERROR(this->get_logger(), "🕒 Timeout: Failed to reach target altitude within 30 seconds after ARMED. Initiating landing...");
         this->landing();
         return;

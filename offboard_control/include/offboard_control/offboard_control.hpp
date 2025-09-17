@@ -25,8 +25,9 @@
 #include "mavros_msgs/srv/command_bool.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
 #include "mavros_msgs/srv/waypoint_pull.hpp"
+#include "custom_msgs/srv/mode_signal.hpp"
 
-#include "/home/uyen/Drone/drone_ws/src/offboard_control/include/offboard_control/offboard_control.hpp"
+// #include "offboard_control/offboard_control.hpp"
 
 
 
@@ -45,6 +46,8 @@ private:
     void arm_drone();
     void arm_callback(rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedFuture future);
     void state_cb(const mavros_msgs::msg::State msg);
+    void set_mode_offboard();
+    void set_mode_offboard_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::SharedFuture future);
     void main_loop();
     void position_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
     void takeoff();
@@ -55,11 +58,12 @@ private:
     void disarm_cb(rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedFuture future);
     void landing();
     void landing_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::SharedFuture future);
-    void service_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
-          std::shared_ptr<std_srvs::srv::SetBool::Response>      response);
+    void service_callback(const std::shared_ptr<custom_msgs::srv::ModeSignal::Request> request,
+          std::shared_ptr<custom_msgs::srv::ModeSignal::Response>      response);
     void follow_trajectory(const std::string& csv_to_read_path);
     void pull_waypoint();
     void pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future);
+    
     // void hover_time(rclcpp::Time start_time_, double period);
     // bool is_stable_position();
 
@@ -70,7 +74,7 @@ private:
     double current_lat_, current_long_, current_alt_;
     bool takeoff_flag, go_ahead_flag, offboard_flag=true, hover_flag=false;
     bool check_armed_, check_landed_, reach_attitude_;
-    bool landing_flag_;
+    bool landing_flag_, offboard_mode;
     bool landing_started_, delay_started_;
     bool pull_waypoint_srv_flag;
     bool send_takeoff_;
@@ -87,7 +91,7 @@ private:
     rclcpp::Client<mavros_msgs::srv::SetMode>::SharedPtr landing_client_;
     rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr process_wp_client_;
     rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedPtr pull_waypoint_client_;
-    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_;
+    rclcpp::Service<custom_msgs::srv::ModeSignal>::SharedPtr service_;
     rclcpp::CallbackGroup::SharedPtr callback_group_;
     rclcpp::SubscriptionOptions subscription_options_;
     rclcpp::TimerBase::SharedPtr timer_, timer_csv;

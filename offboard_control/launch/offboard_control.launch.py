@@ -16,4 +16,10 @@ def generate_launch_description():
                             output="screen",
         
     )
-    return LaunchDescription([process_waypoint_, offboard_control])
+    drone_transformation = Node (package = "offboard_control",
+                                 executable="drone_transformation_node",
+                                 name = "drone_transformation_node",
+                                 output = "screen"
+        
+    )
+    return LaunchDescription([process_waypoint_, offboard_control, drone_transformation])
