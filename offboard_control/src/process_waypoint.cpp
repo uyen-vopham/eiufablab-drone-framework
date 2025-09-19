@@ -37,14 +37,14 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
 
     //---------------Service Client--------------
     //pull waypoin client
-    pull_waypoint_client_ = this ->create_client<mavros_msgs::srv::WaypointPull>("mavros/mission/pull");
+    // pull_waypoint_client_ = this ->create_client<mavros_msgs::srv::WaypointPull>("mavros/mission/pull");
 
 
     //---------------Suscribe topics-------------
-    waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
-        "mavros/mission/waypoints", qos_waypoint,
-        std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
-    );
+    // waypoint_sub_ = this->create_subscription<nav_msgs::msg::Path>(
+    //     "mavros/mission/waypoints", qos_waypoint,
+    //     std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
+    // );
 
     org_position_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
       "mavros/global_position/global",
@@ -82,10 +82,19 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
     // response -> success = true;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming PROCESS WAYPOINT request");
     recieved_rq = true;
+    waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
+        "/offboard_waypoint_list", this->qos_waypoint,
+        std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
+    );
     if (pull_waypoint_srv_flag & write_transfer_wp_flag)
     {response -> success = true;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response ");}
-    
+    else {
+        // có thể reset để ngưng sub
+        waypoint_sub_.reset();
+        response->success = true;
+        response->message = "Subscription deactivated";
+    }
     
 
     // takeoff_flag = true;

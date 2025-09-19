@@ -137,7 +137,6 @@ ament_target_dependencies(process_waypoint_node
 )
 
 
-
 target_include_directories(marker_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
@@ -147,10 +146,6 @@ target_include_directories(waypoints_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
   $<INSTALL_INTERFACE:include>)
-
-
-
-
 
 
 install(TARGETS
@@ -165,5 +160,10 @@ install(TARGETS
 
 install (DIRECTORY launch
 DESTINATION share/${PROJECT_NAME})
+
+###########################################PYTHON SCRIPT###############
+install(PROGRAMS
+  python_script/lora_transmit.py
+  DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

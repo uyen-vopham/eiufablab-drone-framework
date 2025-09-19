@@ -20,6 +20,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 
 #include "std_srvs/srv/set_bool.hpp"
@@ -65,5 +66,6 @@ class ProcessWaypointNode: public rclcpp::Node
     std::string csv_to_read_waypoint;
     std::string csv_to_write_transfer_waypoint;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::QoS qos_waypoint{rclcpp::KeepLast(10)};
     
 };

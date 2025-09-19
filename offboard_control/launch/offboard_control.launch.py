@@ -22,4 +22,9 @@ def generate_launch_description():
                                  output = "screen"
         
     )
+    # lora_transmit_node = Node (package="offboard_control",
+    #                     executable="lora_transmit.py",
+    #                     name = "LoraDrone",
+    #                     output = "screen"
+    # )
     return LaunchDescription([process_waypoint_, offboard_control, drone_transformation])

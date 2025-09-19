@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped, TwistStamped
@@ -10,6 +12,7 @@ from std_msgs.msg import Bool
 from nav_msgs.msg import Path 
 from sensor_msgs.msg import NavSatFix, BatteryState
 from custom_msgs.srv import ModeSignal 
+from mavros_msgs.msg import WaypointList, Waypoint
 import math 
 
 
@@ -54,7 +57,7 @@ class LoraDrone(Node):
         self.subscription_global_position = self.create_subscription(NavSatFix, '/mavros/global_position/global', self.global_position_callback, qos_profile)
         self.subscription_battery = self.create_subscription(BatteryState, '/mavros/battery', self.battery_cb, qos_profile)
         self.subscription_speed = self.create_subscription(TwistStamped, '/mavros/local_position/velocity_local', self.velocity_cb, qos_profile)  
-        self.mission_pub = self.create_publisher(Path, '/mission_path', qos_pub) 
+        self.mission_pub = self.create_publisher(WaypointList, '/offboard_waypoint_list', qos_pub) 
         
        
         self.mode_client = self.create_client(ModeSignal, '/offboard_service') 
@@ -190,7 +193,7 @@ class LoraDrone(Node):
     #Command handler
     def handle_command(self, line: str):
         """Nhận JSON từ Ground qua LoRa:
-           - {"waypoints":[...]}  -> lưu vào path và publish thông qua topic /mission_path
+           - {"waypoints":[...]}  -> lưu vào path và publish thông qua topic /offboard_waypoint_list
         """
         try:
             cmd = json.loads(line)
@@ -203,25 +206,30 @@ class LoraDrone(Node):
         items = cmd.get("waypoints")
         if isinstance(items, list):
             saved = 0
-            path_msg = Path()
-            path_msg.header.stamp = self.get_clock().now().to_msg()
-            path_msg.header.frame_id = "odom"
+            wp_msgs = WaypointList()
+            # wp_msgs.header.stamp = self.get_clock().now().to_msg()
+            # wp_msgs.header.frame_id = "GPS"
+            wp_msgs.current_seq = 0
             try:
                     for wp in items:
-                        if all(k in wp for k in ("x", "y", "z")):
+                        self.get_logger().info(f"ITEM IS {wp}")
+                        if all(k in wp for k in ("lat", "lon", "alt")):
                            
                             saved += 1
-                            pose_stamped = PoseStamped()
-                            pose_stamped.header = path_msg.header
-                            pose_stamped.pose.position.x = float(wp["x"])
-                            pose_stamped.pose.position.y = float(wp["y"])
-                            pose_stamped.pose.position.z = float(wp["z"])
+                            wp_msg = Waypoint()
+                            wp_msg.frame = 3 #MAV_FRAME_GLOBAL 
+                            wp_msg.command = 16 #MAV_CMD_NAV_WAYPOINT
+                            wp_msg.is_current = (saved == 1)
+                            wp_msg.autocontinue = True
+                            wp_msg.x_lat = float(wp["lat"])
+                            wp_msg.y_long = float(wp["lon"])
+                            wp_msg.z_alt = float(wp["alt"])
 
-                            path_msg.poses.append(pose_stamped)
-                            print("path", path_msg) 
+                            wp_msgs.waypoints.append(wp_msg)
+                            print("path", wp) 
                 
-                    self.mission_pub.publish(path_msg)
-                    self.get_logger().info(f"📤 Đã publish {saved} waypoint lên /mission_path")
+                    self.mission_pub.publish(wp_msgs)
+                    self.get_logger().info(f"📤 Đã publish {saved} waypoint lên /offboard_waypoint_list")
                     self._send_json({"event": "uploaded", "status": True, "count": saved})
             except Exception as e:
                 self.get_logger().error(f"❌ Lỗi publish: {e}")
