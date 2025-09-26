@@ -81,14 +81,13 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
     recieved_rq = true;
     // response -> success = true;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming PROCESS WAYPOINT request");
-    recieved_rq = true;
     waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
         "/offboard_waypoint_list", this->qos_waypoint,
         std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
     );
     if (pull_waypoint_srv_flag & write_transfer_wp_flag)
     {response -> success = true;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response ");}
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response from process_waypoint ");}
     else {
         // có thể reset để ngưng sub
         waypoint_sub_.reset();
