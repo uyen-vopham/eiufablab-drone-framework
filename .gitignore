@@ -1,0 +1,4 @@
+.vscode 
+qt/ground_gui/index/credentials.json
+qt/ground_gui/index/map.html
+*.env
