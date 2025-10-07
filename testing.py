@@ -1,204 +1,78 @@
+# Minimum Snap Trajectory Optimization for Drone using minsnap-trajectories library
+# First, install the library: pip install minsnap-trajectories numpy matplotlib
+# This library implements minimum snap trajectory generation suitable for quadrotors/drones.
+# Reference: https://pypi.org/project/minsnap-trajectories/
+
 import numpy as np
-from scipy.optimize import minimize
+import minsnap_trajectories as ms
+import matplotlib.pyplot as plt
 
-# class MinimumSnap():
-#     def __init__(self):
+# Define waypoints for the drone trajectory (3D positions at specific times)
+# Example: Start at (0,0,10), intermediate at (10,0,10) with velocity and accel, end at (20,0,10)
+refs = [
+    ms.Waypoint(
+        time=0.0,
+        position=np.array([0.0, 0.0, 10.0]),  # Starting position (x,y,z)
+    ),
+    ms.Waypoint(
+        time=8.0,
+        position=np.array([10.0, 0.0, 10.0]),
+        velocity=np.array([0.0, 5.0, 0.0]),  # Optional: specify velocity
+        acceleration=np.array([0.1, 0.0, 0.0]),  # Optional: specify acceleration
+    ),
+    ms.Waypoint(
+        time=16.0,
+        position=np.array([20.0, 0.0, 10.0]),
+        # Optional: higher derivatives like jerk can be specified
+    ),
+]
 
-def compute_min_snap_coefficients_multi(waypoints, times):
+# Generate the piecewise polynomial trajectory
+# Using closed-form algorithm, minimizing jerk and snap (orders 3 and 4), continuous up to jerk (order 3)
+polys = ms.generate_trajectory(
+    refs,
+    degree=8,  # Polynomial degree (higher for smoother, but computationally heavier)
+    idx_minimized_orders=(3, 4),  # Minimize jerk and snap
+    num_continuous_orders=3,  # Ensure continuity in position, velocity, acceleration
+    algorithm="closed-form",  # Or "constrained" for other cases
+)
 
-    waypoints = np.asarray(waypoints)
-    times = np.asarray(times)
-    n_segments = len(waypoints) - 1
-    if len(times) != len(waypoints):
-        raise ValueError("Times and waypoints must have same length")
-    if not np.all(np.diff(times) > 0):
-        raise ValueError("Times must be increasing")
-    
-    n_vars = 8 * n_segments
-    
-    # Xây dựng H cho cost 1/2 x^T H x
-    H = np.zeros((n_vars, n_vars))
-    for i in range(n_segments):
-        ti, ti1 = times[i], times[i+1]
-        base = 8 * i
-        for j in range(4):
-            deg_j = 7 - j
-            prod_j = np.prod([deg_j - l for l in range(4)])
-            for k in range(4):
-                deg_k = 7 - k
-                prod_k = np.prod([deg_k - l for l in range(4)])
-                ex = (deg_j - 4) + (deg_k - 4)
-                if ex + 1 != 0:
-                    integral = (ti1**(ex + 1) - ti**(ex + 1)) / (ex + 1)
-                else:
-                    integral = np.log(ti1 / ti) if ti > 0 else 0
-                H[base + j, base + k] = prod_j * prod_k * integral
-    
-    # Hàm lấy row cho đạo hàm deriv tại t cho seg
-    def get_deriv_row(seg, t, deriv):
-        row = np.zeros(n_vars)
-        base = 8 * seg
-        for j in range(8):
-            deg = 7 - j
-            if deg < deriv: continue
-            prod = np.prod([deg - l for l in range(deriv)])
-            row[base + j] = prod * (t ** (deg - deriv))
-        return row
-    
-    # Xây dựng A và b cho constraints A x = b
-    A = np.zeros((0, n_vars))
-    b = np.zeros(0)
-    
-    # Position constraints
-    for i in range(n_segments):
-        ti, ti1 = times[i], times[i+1]
-        A = np.vstack((A, get_deriv_row(i, ti, 0)))
-        b = np.append(b, waypoints[i])
-        A = np.vstack((A, get_deriv_row(i, ti1, 0)))
-        b = np.append(b, waypoints[i+1])
-    
-    # Continuity v/a/j
-    for i in range(1, n_segments):
-        ti = times[i]
-        for deriv in range(1, 4):
-            row = get_deriv_row(i-1, ti, deriv) - get_deriv_row(i, ti, deriv)
-            A = np.vstack((A, row))
-            b = np.append(b, 0)
-    
-    # Boundary at start and end
-    for deriv in range(1, 4):
-        A = np.vstack((A, get_deriv_row(0, times[0], deriv)))
-        b = np.append(b, 0)
-    for deriv in range(1, 4):
-        A = np.vstack((A, get_deriv_row(n_segments-1, times[-1], deriv)))
-        b = np.append(b, 0)
-    
-    eigenvalues = np.linalg.eigvals(H)
+# Sample the trajectory derivatives (position, velocity, acceleration, etc.)
+t_sample = np.linspace(0, 16, 200)  # Time points to sample
+pva = ms.compute_trajectory_derivatives(polys, t_sample, 2)  # Up to acceleration (order 2)
+position = pva[0, ...].T  # Shape: (num_samples, 3) for x,y,z
+velocity = pva[1, ...].T
+acceleration = pva[2, ...].T
 
-    # Objective and constraint functions
-    def objective(x):
-        return 0.5 * np.dot(x.T, np.dot(H, x))
-    
-    def constraint(x):
-        return np.dot(A, x) - b
-    
-    # Optimize
-    x0 = np.zeros(n_vars)
-    cons = {'type': 'eq', 'fun': constraint}
-    res = minimize(objective, x0, method='SLSQP', constraints=[cons], options={'disp': False, 'maxiter': 1000})
-    if not res.success:
-        raise ValueError(f"Optimization failed: {res.message}")
-    
-    # Extract coeffs
-    return [res.x[8*i:8*(i+1)] for i in range(n_segments)]
-    """
-    Tính hệ số đa thức bậc 7 cho minimum snap trajectory qua nhiều waypoints (smooth, continuous v/a/j).
-    - waypoints: list/array vị trí [p0, p1, ..., pn]
-    - times: list/array thời gian [t0=0, t1, ..., tn=T]
-    Trả về list coeffs, mỗi coeffs là array [c0 (t^7), c1 (t^6), ..., c7 (const)] cho từng segment.
-    """
- 
+# For drone-specific: Compute quadrotor states and inputs (thrust, etc.)
+# Assumes a simple quadrotor model
+t_quad = np.linspace(0, 16, 200)
+states, inputs = ms.compute_quadrotor_trajectory(
+    polys,
+    t_quad,
+    vehicle_mass=1.0,  # Drone mass in kg
+    yaw="velocity",  # Yaw aligned with velocity direction
+    drag_params=ms.RotorDragParameters(0.1, 0.2, 1.0),  # Rotor drag coefficients
+)
 
-def evaluate_position_multi(coeffs_list, times, t):
-    """
-    Đánh giá vị trí x(t) tại thời gian t (t in [times[0], times[-1]]).
-    """
-    n_segments = len(coeffs_list)
-    for i in range(n_segments):
-        if times[i] <= t <= times[i+1]:
-            return np.polyval(coeffs_list[i], t)
-    raise ValueError("t out of range")
+# Plot the trajectory (position over time)
+fig, axs = plt.subplots(3, 1, figsize=(10, 8))
+axs[0].plot(t_sample, position[:, 0], label='x')
+axs[0].plot(t_sample, position[:, 1], label='y')
+axs[0].plot(t_sample, position[:, 2], label='z')
+axs[0].set_ylabel('Position (m)')
+axs[0].legend()
 
-def interpolate_points_multi(coeffs_list, times, num_points=50):
-    """
-    Nội suy num_points điểm trên toàn quỹ đạo, trả về list tuple (t, x(t)).
-    """
-    t_values = np.linspace(times[0], times[-1], num_points)
-    points = []
-    for t in t_values:
-        x = evaluate_position_multi(coeffs_list, times, t)
-        points.append((t, x))
-    return points
+axs[1].plot(t_sample, np.linalg.norm(velocity, axis=1))
+axs[1].set_ylabel('Speed (m/s)')
 
-def compute_euclidean_distances(waypoints):
-    """
-    Tính quãng đường Euclidean giữa các waypoints liên tiếp.
-    - waypoints: list hoặc array của các điểm, mỗi điểm là số (1D) hoặc tuple/list (2D/3D).
-    Trả về: list các khoảng cách s_i và tổng quãng đường s_total.
-    """
-    waypoints = np.asarray(waypoints)
-    if waypoints.ndim == 1:  # 1D
-        s_segments = np.abs(np.diff(waypoints))
-    else:  # 2D/3D
-        s_segments = np.sqrt(np.sum(np.diff(waypoints, axis=0)**2, axis=1))
-    s_total = np.sum(s_segments)
-    print(s_total)
-    return s_segments.tolist(), s_total
+axs[2].plot(t_sample, np.linalg.norm(acceleration, axis=1))
+axs[2].set_ylabel('Acceleration magnitude (m/s²)')
+axs[2].set_xlabel('Time (s)')
 
-def cal_time_for_fly(s, v_max):
-    T = s/(v_max*0.619) # , nhằm hiểu rằng vận tốc không được vượt quá vận tốc tối đa
-    return T
+plt.tight_layout()
+plt.show()
 
-def check_constrains_v (coeffs_list_x, times, v_max = 5.0, a_max = 2.0, num_points = 100):
-    t_values = np.linspace(times[0], times[-1], num_points)
-    print("t_values: ",len(t_values))
-    for i in range(len(coeffs_list_x)):
-        t_seg = t_values[(t_values >= times[i]) & (t_values <= times[i+1])]
-        coeffs_x = coeffs_list_x[i][::-1]
-        # print("t_values: ",len(t_values))
-        # coeffs_y = coeffs_list_y[i][::-1]
-        # coeffs_z = coeffs_list_z[i][::-1]
-        v_coeffs_x = np.polyder(coeffs_x)
-        a_coeffs_x = np.polyder(v_coeffs_x)
-        for t in t_seg:
-            v_total = np.sqrt(np.polyval(v_coeffs_x, t)**2 )
-            a_total = np.sqrt(np.polyval(a_coeffs_x, t)**2 )
-            if v_max is not None and v_total > v_max:
-                print(f"Constraint violated: v_total={v_total:.2f} > v_max={v_max} at t={t:.2f}")
-                return False
-            if a_max is not None and a_total > a_max:
-                print(f"Constraint violated: a_total={a_total:.2f} > a_max={a_max} at t={t:.2f}")
-                return False
-    return True
-
-
-def main ():
-    waypoints = [[0, 0,0], [1,2,5], [3,4,5]]  # Ví dụ 4 điểm
-    # waypoints_y = [0,2,4,1]
-    # waypoints_z = [0,5,5,5]
-    # T = 3  # Tổng thời gian
-    wp_x = [i[0] for i in waypoints]
-    wp_y = [i[1] for i in waypoints]
-    wp_z = [i[2] for i in waypoints]
-    print(wp_x)
-
-    s_segments, total_s = compute_euclidean_distances(waypoints)
-    total_time = cal_time_for_fly(total_s, 10)
-    
-    # times = np.linspace(0, total_time, len(waypoints))  # Phân bổ thời gian đều
-    times = [0]
-    for s_i in s_segments:
-        times.append(times[-1] + total_time *s_i / total_s)
-
-    coeffs_list_x = compute_min_snap_coefficients_multi(wp_x, times)
-    coeffs_list_y = compute_min_snap_coefficients_multi(wp_y, times)
-    coeffs_list_z = compute_min_snap_coefficients_multi(wp_z, times)
-    # print("Coeffs for each segment:", coeffs_list_x)
-    points_x = interpolate_points_multi(coeffs_list_x, times, num_points=20)
-    points_y = interpolate_points_multi(coeffs_list_y, times, num_points=20)
-    points_z = interpolate_points_multi(coeffs_list_z, times, num_points=20)
-    # print("times", times)
-    check_constrains_v(coeffs_list_x, times)
-    
-    # for t, x in points_x:
-    #     print(f"t={t:.2f}, x(t)={x:.3f}")
-  
-# Ví dụ sử dụng
-if __name__ == "__main__":
-    main()
-    # Danh sách điểm (waypoints)
-    
-
-
-
-# eiufablab-drone-framework
+# The 'states' includes position, velocity, attitude, etc., for drone control
+# 'inputs' includes thrust and body rates for the drone actuators
+print("Trajectory generated successfully. Use 'states' for position/orientation and 'inputs' for control.")
