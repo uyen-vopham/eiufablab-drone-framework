@@ -27,6 +27,7 @@
 #include "mavros_msgs/srv/command_bool.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
 #include "mavros_msgs/srv/waypoint_pull.hpp"
+#include "mavros_msgs/msg/position_target.hpp"
 #include "GeographicLib/LocalCartesian.hpp"
 
 //#include "/home/uyen/Drone/drone_ws/src/offboard_control/include/offboard_control/offboard_control.hpp"
@@ -46,10 +47,11 @@ class ProcessWaypointNode: public rclcpp::Node
                         const float& long0, const float& alt0);
     std::string convertGPS2ENU_function(double lat0, double long0, double alt0, std::vector<double> line);
     void write_csv_file(const std::string& csv_path_to_write, std::string& line);
-    void pull_waypoint();
+    void pull_waypoint(const std::string& csv_to_read_path);
     void pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future);
     void waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg);
     void main_loop();
+
 
     private:
     rclcpp::CallbackGroup::SharedPtr callback_group_;
@@ -58,10 +60,16 @@ class ProcessWaypointNode: public rclcpp::Node
     rclcpp::Subscription<mavros_msgs::msg::WaypointList>::SharedPtr waypoint_sub_;
     rclcpp::Subscription<mavros_msgs::msg::WaypointList>::SharedPtr waypoint_sub_org_;
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr org_position_;
+    rclcpp::Publisher<mavros_msgs::msg::PositionTarget>::SharedPtr waypoint_processed_pub_;
+    
+    mavros_msgs::msg::PositionTarget target;
+    
     bool recieved_rq, response_sig;
     bool pull_waypoint_srv_flag, write_transfer_wp_flag;
     bool get_org_pos;
+    bool transfered_wp_flag = false;
     double org_lat_, org_long_, org_alt_;
+
     std::atomic<bool> got_first_;
     std::string csv_to_write_waypoint;
     std::string csv_to_read_waypoint;

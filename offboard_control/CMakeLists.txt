@@ -19,7 +19,7 @@ find_package(custom_msgs REQUIRED)
 
 include_directories(include)
 
-#################################################
+#################################################OFFBOARD NODE
 add_executable(offboard_node
   src/offboard_control.cpp
 )
@@ -38,17 +38,9 @@ target_include_directories(offboard_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
   $<INSTALL_INTERFACE:include>)   
-######################################################
+###################################################### OFFBOARD NODE
 
 
-
-add_executable(marker_node
-  src/marker_publish.cpp
-)
-
-add_executable(waypoints_node
-  src/recieve_transform_waypoints.cpp
-)
 ############################################################## OFFBOARD SERVER NODE
 add_executable(offboard_server_node
   src/offboard_control_server.cpp 
@@ -90,6 +82,19 @@ target_include_directories(process_waypoint_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
   $<INSTALL_INTERFACE:include>)
+
+ament_target_dependencies(process_waypoint_node
+  rclcpp
+  geometry_msgs
+  mavros_msgs
+  nav_msgs
+  tf2_ros
+  visualization_msgs
+  std_srvs
+  tf2
+  custom_msgs
+  # GeographicLib
+)
 ################################################################ PROCESS WAYPOINT NODE
 
 add_executable(drone_transformation_node
@@ -121,20 +126,14 @@ ament_target_dependencies(waypoints_node
   tf2
   visualization_msgs)
 
-
-
-ament_target_dependencies(process_waypoint_node
-  rclcpp
-  geometry_msgs
-  mavros_msgs
-  nav_msgs
-  tf2_ros
-  visualization_msgs
-  std_srvs
-  tf2
-  custom_msgs
-  # GeographicLib
+add_executable(marker_node
+  src/marker_publish.cpp
 )
+
+add_executable(waypoints_node
+  src/recieve_transform_waypoints.cpp
+)
+
 
 
 target_include_directories(marker_node

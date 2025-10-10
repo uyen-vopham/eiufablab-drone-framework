@@ -6,17 +6,22 @@ using std::placeholders::_2;
 
 ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieved_rq(false),
                                                                         response_sig(false),
-                                                                        write_transfer_wp_flag(false)
+                                                                        write_transfer_wp_flag(false),
+                                                                        transfered_wp_flag(false)
+                                                                        
 {
     
     //------------Declare parameters------
     this->declare_parameter<std::string>("csv_to_write_waypoint");
     this->declare_parameter<std::string>("csv_to_write_transfer_waypoint");
+    // this->declare_parameter<std::string>("csv_to_read_waypoint");
 
     //------------Get parameters----------
     this -> csv_to_write_waypoint = this->get_parameter("csv_to_write_waypoint").as_string();
     this -> csv_to_write_transfer_waypoint = this->get_parameter("csv_to_write_transfer_waypoint").as_string();
+    // this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
     csv_to_read_waypoint = csv_to_write_waypoint;
+    csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
     //------------QoS---------------------------
     //----DRONE WAYPOINTS  
     rclcpp::QoS qos_waypoint(rclcpp::KeepLast(10));
@@ -41,6 +46,11 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     // pull_waypoint_client_ = this ->create_client<mavros_msgs::srv::WaypointPull>("mavros/mission/pull");
 
 
+   //-----------------Publish topics--------------
+    waypoint_processed_pub_ = this->create_publisher<mavros_msgs::msg::PositionTarget>(
+        "/offboard_control/waypoint_processed", qos_waypoint
+    );
+   
     //---------------Suscribe topics-------------
     // waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
     //     "/offboard_waypoint_list", qos_waypoint,
@@ -80,24 +90,34 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
           std::shared_ptr<std_srvs::srv::SetBool::Response>  response)
 {
     recieved_rq = true;
-    // response -> success = true;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "🍊 Incoming PROCESS WAYPOINT request");
-    waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
-        "/offboard_waypoint_list", this->qos_waypoint,
-        std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
-    );
-    if (write_transfer_wp_flag)
-    {response -> success = true;
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response from process_waypoint ");}
-    else {
-        // có thể reset để ngưng sub
-        waypoint_sub_.reset();
-        response->success = true;
-        response->message = "Subscription deactivated";
-    }
-    
+    target.header.stamp = this->now();
+    target.header.frame_id = "map";
+    target.coordinate_frame = mavros_msgs::msg::PositionTarget::FRAME_LOCAL_NED;
 
-    // takeoff_flag = true;
+    //Bỏ qua vận tốc, gia tốc 
+    target.type_mask = (mavros_msgs::msg::PositionTarget::IGNORE_VX |
+                       mavros_msgs::msg::PositionTarget::IGNORE_VY |
+                       mavros_msgs::msg::PositionTarget::IGNORE_VZ |
+                       mavros_msgs::msg::PositionTarget::IGNORE_AFX |
+                       mavros_msgs::msg::PositionTarget::IGNORE_AFY |
+                       mavros_msgs::msg::PositionTarget::IGNORE_AFZ |
+                       mavros_msgs::msg::PositionTarget::FORCE);
+  
+    // response -> success = true;
+    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "🍊 Incoming PROCESS WAYPOINT request");
+    // waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
+    //     "/offboard_waypoint_list", this->qos_waypoint,
+    //     std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
+    // );
+    // if (write_transfer_wp_flag)
+    // {response -> success = true;
+    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response from process_waypoint ");}
+    // else {
+    //     // có thể reset để ngưng sub
+    //     waypoint_sub_.reset();
+    //     response->success = true;
+    //     response->message = "Subscription deactivated";
+    // }
 }
 
 // void ProcessWaypointNode::pull_waypoint(){
@@ -258,11 +278,59 @@ void ProcessWaypointNode::write_csv_file(const std::string& csv_path_to_write, s
     return;
 }
 
+void ProcessWaypointNode::pull_waypoint(const std::string& csv_to_read_path)
+{
+    if (transfered_wp_flag) { return; }
+
+    std::ifstream file(csv_to_read_path);
+    std::cout << csv_to_read_path << std::endl;
+
+    if (!file.is_open()) {
+        std::cout << "ERROR: Cannot open csv file" << std::endl;
+        return;
+    }
+
+    std::cout << "INFO: CSV file is open, and ready to transfer." << std::endl;
+
+    // ✅ Preview file content
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::cout << "🧾 File content preview:\n" << content.substr(0, 200) << std::endl;
+
+    // 👉 Reset lại luồng để đọc lại từ đầu
+    file.clear();  // clear EOF flag
+    file.seekg(0, std::ios::beg);
+
+    std::string line;
+    int line_count = 0;
+
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        line_count++;
+
+        std::stringstream ss(line);
+        std::string token;
+        std::vector<double> values;
+
+        while (std::getline(ss, token, ',')) {
+            try {
+                values.push_back(std::stod(token));
+            } catch (...) {
+                // có thể dòng đầu là header, bỏ qua
+            }
+        }
+    }
+
+    std::cout << "📄 Tổng số hàng (waypoints) trong CSV: " << line_count << std::endl;
+    transfered_wp_flag = true;
+    
+}
+
 void ProcessWaypointNode::main_loop() {
     if (recieved_rq)
     {
-    // pull_waypoint();
-    read_csv_file(csv_to_read_waypoint, csv_to_write_transfer_waypoint, org_lat_, org_long_, org_alt_);}
+    pull_waypoint(csv_to_read_waypoint);
+    // read_csv_file(csv_to_read_waypoint, csv_to_write_transfer_waypoint, org_lat_, org_long_, org_alt_);
+    }
     else {return;}
    
     
