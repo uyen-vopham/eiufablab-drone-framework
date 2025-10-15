@@ -11,7 +11,7 @@
 
 
 
-
+#include "python3.10/Python.h"
 
 
 #include "rclcpp/rclcpp.hpp"
@@ -50,6 +50,7 @@ class ProcessWaypointNode: public rclcpp::Node
     void pull_waypoint(const std::string& csv_to_read_path);
     void pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future);
     void waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg);
+    void minimum_snap();
     void main_loop();
 
 
@@ -74,6 +75,23 @@ class ProcessWaypointNode: public rclcpp::Node
     std::string csv_to_write_waypoint;
     std::string csv_to_read_waypoint;
     std::string csv_to_write_transfer_waypoint;
+  
+    //Python declaration
+    PyObject* minimum_snap_name;
+    PyObject* minimum_snap_args;
+    PyObject* minimum_snap_result;
+    PyObject* drone_raw_time;
+    PyObject* drone_raw_pos;
+    PyObject* drone_raw_vel;
+    PyObject* drone_raw_acc;
+    PyObject* minimum_snap_module;
+    PyObject* minimum_snap_check_dynamic;
+    PyObject* args_check;
+    PyObject* result_check;
+    PyObject* minimum_snap_class;
+    PyObject* minimum_snap_instance;
+    PyObject* minimum_snap_generate;
+    // std::tuple<double> drone_raw_time, drone_raw_pos, drone_raw_vel, drone_raw_acc;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::QoS qos_waypoint{rclcpp::KeepLast(10)};
     

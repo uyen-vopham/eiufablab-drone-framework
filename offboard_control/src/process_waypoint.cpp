@@ -14,14 +14,14 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     //------------Declare parameters------
     this->declare_parameter<std::string>("csv_to_write_waypoint");
     this->declare_parameter<std::string>("csv_to_write_transfer_waypoint");
-    // this->declare_parameter<std::string>("csv_to_read_waypoint");
+    this->declare_parameter<std::string>("csv_to_read_waypoint");
 
     //------------Get parameters----------
     this -> csv_to_write_waypoint = this->get_parameter("csv_to_write_waypoint").as_string();
     this -> csv_to_write_transfer_waypoint = this->get_parameter("csv_to_write_transfer_waypoint").as_string();
-    // this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
-    csv_to_read_waypoint = csv_to_write_waypoint;
-    csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
+    this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
+    // csv_to_read_waypoint = csv_to_write_waypoint;
+    // csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
     //------------QoS---------------------------
     //----DRONE WAYPOINTS  
     rclcpp::QoS qos_waypoint(rclcpp::KeepLast(10));
@@ -102,60 +102,9 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
                        mavros_msgs::msg::PositionTarget::IGNORE_AFY |
                        mavros_msgs::msg::PositionTarget::IGNORE_AFZ |
                        mavros_msgs::msg::PositionTarget::FORCE);
-  
-    // response -> success = true;
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "🍊 Incoming PROCESS WAYPOINT request");
-    // waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
-    //     "/offboard_waypoint_list", this->qos_waypoint,
-    //     std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
-    // );
-    // if (write_transfer_wp_flag)
-    // {response -> success = true;
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response from process_waypoint ");}
-    // else {
-    //     // có thể reset để ngưng sub
-    //     waypoint_sub_.reset();
-    //     response->success = true;
-    //     response->message = "Subscription deactivated";
-    // }
+
 }
 
-// void ProcessWaypointNode::pull_waypoint(){
-//     if (pull_waypoint_srv_flag){
-//         // RCLCPP_INFO(this->get_logger(), "❎ Drone is already send client to pull waypoint.");
-//         return; 
-//     }
-    
-//     if (!pull_waypoint_client_->wait_for_service(std::chrono::seconds(2))){
-//         RCLCPP_WARN(this->get_logger(), "Waypoint pull service not available");
-//         return;
-//     }
-//     auto pull_request_ = std::make_shared<mavros_msgs::srv::WaypointPull::Request>();
-//     auto future = pull_waypoint_client_->async_send_request(pull_request_,
-//         std::bind(&ProcessWaypointNode::pull_waypoint_cb, this, std::placeholders::_1));
-//     RCLCPP_INFO(this->get_logger(), "PULLED");
-//     pull_waypoint_srv_flag = true;
-// }
-
-// void ProcessWaypointNode::pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future){
-//     try
-//     {
-//         auto response = future.get();
-//         if (response->success)
-//         {
-//             RCLCPP_INFO(this->get_logger(),
-//                 "Successfully pulled %u waypoints from FCU", response->wp_received);
-//         }
-//         else
-//         {
-//             RCLCPP_WARN(this->get_logger(), "Failed to pull mission waypoints from FCU");
-//         }
-//     }
-//     catch (const std::exception &e)
-//     {
-//         RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
-//     }
-// }
 
 
 void ProcessWaypointNode::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg){
@@ -323,6 +272,78 @@ void ProcessWaypointNode::pull_waypoint(const std::string& csv_to_read_path)
     std::cout << "📄 Tổng số hàng (waypoints) trong CSV: " << line_count << std::endl;
     transfered_wp_flag = true;
     
+}
+
+// create a function that used for call python script that calculate minimum snap trajectory for optimizing waypoints
+void ProcessWaypointNode::minimum_snap(){
+    Py_Initialize(); //Initial Python interpreter
+    // Add path to folder that contains file WaypointOptimization.py
+    PyRun_SimpleString("import sys");
+    PyRun_SimpleString("sys.path.append('/home/uyen/Drone/drone_ws/src/offboard_control/python_script/Mathematic')");
+
+    //Import module OptimizeWaypoints (class OptimizeWaypoints)
+    minimum_snap_name = PyUnicode_DecodeFSDefault("WaypointOptimization");
+    minimum_snap_module = PyImport_Import(minimum_snap_name);
+    Py_DECREF(minimum_snap_name);
+
+    if (minimum_snap_module != nullptr){
+        // Take class OptimzeWaypoints in module
+        minimum_snap_class = PyObject_GetAttrString(minimum_snap_module, "OptimizeWaypoints");
+        if (minimum_snap_class && PyCallable_Check(minimum_snap_class)){
+            minimum_snap_instance = PyObject_CallObject(minimum_snap_class, nullptr);
+
+            //Call generate_trajectorty_from_csv
+            minimum_snap_generate = PyObject_GetAttrString(minimum_snap_instance, "generate_trajectory_from_csv");
+
+            if (minimum_snap_generate && PyCallable_Check(minimum_snap_generate)){
+                minimum_snap_args = Py_BuildValue("(s)", csv_to_write_transfer_waypoint);
+                minimum_snap_result = PyObject_CallObject(minimum_snap_generate, minimum_snap_args);
+            
+                if (minimum_snap_result){
+                    std::cout << "✅ Trajectory generated successfully.\n";
+                    Py_DECREF(minimum_snap_result);
+                }
+                else{
+                    PyErr_Print();
+                    std::cerr << "❌ Error calling generate_trajectory_from_csv()\n";
+                }
+                Py_XDECREF(minimum_snap_args);
+                Py_XDECREF(minimum_snap_result);
+                drone_raw_time = PyTuple_GetItem(minimum_snap_result, 0);
+                drone_raw_pos = PyTuple_GetItem(minimum_snap_result, 1);
+                drone_raw_vel = PyTuple_GetItem(minimum_snap_result, 2);
+                drone_raw_acc = PyTuple_GetItem(minimum_snap_result, 3);
+            }
+            // PyObject* drone_raw_time = PyTuple_GetItem(minimum_snap_result, 0);
+            //Call check_dynamic_limits
+            minimum_snap_check_dynamic = PyObject_GetAttrString(minimum_snap_instance, "check_dynamic_limits");
+            if (minimum_snap_check_dynamic && PyCallable_Check(minimum_snap_check_dynamic)){
+                args_check = Py_BuildValue("(00)", drone_raw_vel, drone_raw_acc);
+                result_check = PyObject_CallObject(minimum_snap_check_dynamic, args_check);
+
+                if (result_check){
+                    bool in_limit = PyObject_IsTrue(result_check);
+                    // Py_DECREF(pCheckResult);
+                }
+                else{
+                    PyErr_Print();
+                    std::cerr << "❌ Error calling check_dynamic_limits()\n";
+                }
+                Py_XDECREF(args_check);
+                Py_XDECREF(result_check);
+            }
+        Py_XDECREF(minimum_snap_instance); 
+        Py_XDECREF(minimum_snap_class);
+        Py_XDECREF(minimum_snap_generate);
+        Py_XDECREF(minimum_snap_check_dynamic);
+        }
+            
+    }
+        // 🔚 Dọn dẹp
+    Py_XDECREF(minimum_snap_module);
+    Py_XDECREF(minimum_snap_name);
+
+    Py_Finalize();
 }
 
 void ProcessWaypointNode::main_loop() {

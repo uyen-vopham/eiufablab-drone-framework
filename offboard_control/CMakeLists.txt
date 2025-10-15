@@ -70,14 +70,7 @@ add_executable(process_waypoint_node
   src/process_waypoint.cpp
 )
 target_link_libraries(process_waypoint_node Geographic)
-ament_target_dependencies(marker_node
-  rclcpp
-  geometry_msgs
-  visualization_msgs
-  nav_msgs
-  tf2
-  tf2_ros
-)
+
 target_include_directories(process_waypoint_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
@@ -115,42 +108,49 @@ target_include_directories(drone_transformation_node
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
+# ament_target_dependencies(marker_node
+#   rclcpp
+#   geometry_msgs
+#   visualization_msgs
+#   nav_msgs
+#   tf2
+#   tf2_ros
+# )
+
+# ament_target_dependencies(waypoints_node
+#   rclcpp
+#   geometry_msgs
+#   mavros_msgs
+#   nav_msgs
+#   tf2_ros
+#   tf2
+#   visualization_msgs)
+
+# add_executable(marker_node
+#   src/marker_publish.cpp
+# )
+
+# add_executable(waypoints_node
+#   src/recieve_transform_waypoints.cpp
+# )
 
 
-ament_target_dependencies(waypoints_node
-  rclcpp
-  geometry_msgs
-  mavros_msgs
-  nav_msgs
-  tf2_ros
-  tf2
-  visualization_msgs)
 
-add_executable(marker_node
-  src/marker_publish.cpp
-)
+# target_include_directories(marker_node
+#   PUBLIC 
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
+#   $<INSTALL_INTERFACE:include>)  
 
-add_executable(waypoints_node
-  src/recieve_transform_waypoints.cpp
-)
-
-
-
-target_include_directories(marker_node
-  PUBLIC 
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
-  $<INSTALL_INTERFACE:include>)  
-
-target_include_directories(waypoints_node
-  PUBLIC 
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
-  $<INSTALL_INTERFACE:include>)
+# target_include_directories(waypoints_node
+#   PUBLIC 
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/offboard_control>
+#   $<INSTALL_INTERFACE:include>)
 
 
 install(TARGETS
   offboard_node
-  marker_node
-  waypoints_node
+  # marker_node
+  # waypoints_node
   offboard_server_node
   process_waypoint_node
   drone_transformation_node
@@ -158,7 +158,8 @@ install(TARGETS
 )
 
 install (DIRECTORY launch
-DESTINATION share/${PROJECT_NAME})
+DESTINATION share/${PROJECT_NAME}
+)
 
 ###########################################PYTHON SCRIPT###############
 install(PROGRAMS

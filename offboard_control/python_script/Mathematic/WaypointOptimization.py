@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from OptimalTrajectory import OptimalTrajectory
 from TrajectoryWaypoint import TrajectoryWaypoint
 
-class OptimizeSpline ():
+class OptimizeWaypoints():
     def __init__(self):
         self.file_path = ""
 
@@ -25,7 +25,7 @@ class OptimizeSpline ():
 
     def generate_trajectory_from_csv(self, csv_path, output_csv="minimum_snap_traj.csv", aggressiveness=1.0, sample_hz=1):
         #read input data
-        waypoints = load_waypoints_from_csv(csv_path)
+        waypoints = self.load_waypoints_from_csv(csv_path)
         number_of_waypoints = len(waypoints)
         if number_of_waypoints < 2:
             raise ValueError("Need at least two waypoints to generate a trajectory.")
@@ -75,30 +75,31 @@ class OptimizeSpline ():
 
         return t, pos, vel, acc
 
-def check_dynamic_limits(vel, acc, vmax=2.0, amax=2.0):
-    
-    v_norm = np.linalg.norm(vel, axis=1)
-    a_norm = np.linalg.norm(acc, axis=1)
+    def check_dynamic_limits(self, vel, acc, vmax=2.0, amax=2.0):
+        
+        v_norm = np.linalg.norm(vel, axis=1)
+        a_norm = np.linalg.norm(acc, axis=1)
 
-    v_max_measured = np.max(v_norm)
-    a_max_measured = np.max(a_norm)
+        v_max_measured = np.max(v_norm)
+        a_max_measured = np.max(a_norm)
 
-    print(f"Max velocity: {v_max_measured:.2f} m/s (limit: {vmax} m/s)")
-    print(f"Max acceleration: {a_max_measured:.2f} m/s² (limit: {amax} m/s²)")
+        print(f"Max velocity: {v_max_measured:.2f} m/s (limit: {vmax} m/s)")
+        print(f"Max acceleration: {a_max_measured:.2f} m/s² (limit: {amax} m/s²)")
 
-    if v_max_measured > vmax:
-        print("🚨 Cảnh báo: Vượt giới hạn vận tốc!")
-    if a_max_measured > amax:
-        print("🚨 Cảnh báo: Vượt giới hạn gia tốc!")
+        if v_max_measured > vmax:
+            print("🚨 Cảnh báo: Vượt giới hạn vận tốc!")
+        if a_max_measured > amax:
+            print("🚨 Cảnh báo: Vượt giới hạn gia tốc!")
 
-    return (v_max_measured <= vmax) and (a_max_measured <= amax)
+        return (v_max_measured <= vmax) and (a_max_measured <= amax)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    path_csv = "waypoints.csv"
-    t, pos, vel, acc = generate_trajectory_from_csv(path_csv)
-    check_dynamic = check_dynamic_limits(vel, acc)
-    if not check_dynamic:
-        print("Trajectory exceeds dynamic limits. Please adjust waypoints or aggressiveness.")
-    else:
-        print("Trajectory is within dynamic limits.")
+#     path_csv = "waypoints.csv"
+#     optimization = OptimizeWaypoint()
+#     t, pos, vel, acc = optimization.generate_trajectory_from_csv(path_csv)
+#     check_dynamic = optimization.check_dynamic_limits(vel, acc)
+#     if not check_dynamic:
+#         print("Trajectory exceeds dynamic limits. Please adjust waypoints or aggressiveness.")
+#     else:
+#         print("Trajectory is within dynamic limits.")

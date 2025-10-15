@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    process_waypoint_ = Node (package = "offboard_control",
+    process_waypoint = Node (package = "offboard_control",
                               executable="process_waypoint_node",
                               name = "process_waypoint_node",
                               output="screen",
@@ -27,4 +27,4 @@ def generate_launch_description():
     #                     name = "LoraDrone",
     #                     output = "screen"
     # )
-    return LaunchDescription([process_waypoint_, offboard_control, drone_transformation])
+    return LaunchDescription([process_waypoint, offboard_control, drone_transformation])
