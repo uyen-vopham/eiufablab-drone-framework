@@ -7,7 +7,8 @@ using std::placeholders::_2;
 ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieved_rq(false),
                                                                         response_sig(false),
                                                                         write_transfer_wp_flag(false),
-                                                                        transfered_wp_flag(false)
+                                                                        transfered_wp_flag(false),
+                                                                        optimize_flag(false)
                                                                         
 {
     
@@ -15,11 +16,14 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     this->declare_parameter<std::string>("csv_to_write_waypoint");
     this->declare_parameter<std::string>("csv_to_write_transfer_waypoint");
     this->declare_parameter<std::string>("csv_to_read_waypoint");
+    // this->declare_parameter<std::string>("csv_to_optimize_waypoint");
 
     //------------Get parameters----------
     this -> csv_to_write_waypoint = this->get_parameter("csv_to_write_waypoint").as_string();
     this -> csv_to_write_transfer_waypoint = this->get_parameter("csv_to_write_transfer_waypoint").as_string();
     this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
+    // this -> csv_to_optimize_waypoint = this->get_parameter("csv_to_optimize_waypoint").as_string();
+    csv_to_optimize_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/python_script/Mathematic/waypoints.csv";
     // csv_to_read_waypoint = csv_to_write_waypoint;
     // csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
     //------------QoS---------------------------
@@ -275,81 +279,119 @@ void ProcessWaypointNode::pull_waypoint(const std::string& csv_to_read_path)
 }
 
 // create a function that used for call python script that calculate minimum snap trajectory for optimizing waypoints
-void ProcessWaypointNode::minimum_snap(){
-    Py_Initialize(); //Initial Python interpreter
-    // Add path to folder that contains file WaypointOptimization.py
+void ProcessWaypointNode::minimum_snap_python(){
+    if (optimize_flag) return;
+
+    // ✅ Làm sạch đường dẫn trước (xóa ký tự ẩn hoặc không in được)
+    // csv_to_optimize_waypoint.erase(
+    //     std::remove_if(csv_to_optimize_waypoint.begin(), csv_to_optimize_waypoint.end(),
+    //         [](unsigned char c){ return c < 32 || c == 0x9B || c == 0xA0; }),
+    //     csv_to_optimize_waypoint.end()
+    // );
+
+    std::cout << "📂 CSV path (clean): " << csv_to_optimize_waypoint << std::endl;
+
+    // ✅ Khởi tạo Python interpreter (chỉ nên gọi 1 lần cho node, nhưng tạm thời giữ nguyên)
+    Py_Initialize();
     PyRun_SimpleString("import sys");
     PyRun_SimpleString("sys.path.append('/home/uyen/Drone/drone_ws/src/offboard_control/python_script/Mathematic')");
 
-    //Import module OptimizeWaypoints (class OptimizeWaypoints)
-    minimum_snap_name = PyUnicode_DecodeFSDefault("WaypointOptimization");
-    minimum_snap_module = PyImport_Import(minimum_snap_name);
-    Py_DECREF(minimum_snap_name);
+    // ✅ Import module
+    PyObject* pName = PyUnicode_DecodeFSDefault("WaypointOptimization");
+    PyObject* pModule = PyImport_Import(pName);
+    Py_DECREF(pName);
 
-    if (minimum_snap_module != nullptr){
-        // Take class OptimzeWaypoints in module
-        minimum_snap_class = PyObject_GetAttrString(minimum_snap_module, "OptimizeWaypoints");
-        if (minimum_snap_class && PyCallable_Check(minimum_snap_class)){
-            minimum_snap_instance = PyObject_CallObject(minimum_snap_class, nullptr);
-
-            //Call generate_trajectorty_from_csv
-            minimum_snap_generate = PyObject_GetAttrString(minimum_snap_instance, "generate_trajectory_from_csv");
-
-            if (minimum_snap_generate && PyCallable_Check(minimum_snap_generate)){
-                minimum_snap_args = Py_BuildValue("(s)", csv_to_write_transfer_waypoint);
-                minimum_snap_result = PyObject_CallObject(minimum_snap_generate, minimum_snap_args);
-            
-                if (minimum_snap_result){
-                    std::cout << "✅ Trajectory generated successfully.\n";
-                    Py_DECREF(minimum_snap_result);
-                }
-                else{
-                    PyErr_Print();
-                    std::cerr << "❌ Error calling generate_trajectory_from_csv()\n";
-                }
-                Py_XDECREF(minimum_snap_args);
-                Py_XDECREF(minimum_snap_result);
-                drone_raw_time = PyTuple_GetItem(minimum_snap_result, 0);
-                drone_raw_pos = PyTuple_GetItem(minimum_snap_result, 1);
-                drone_raw_vel = PyTuple_GetItem(minimum_snap_result, 2);
-                drone_raw_acc = PyTuple_GetItem(minimum_snap_result, 3);
-            }
-            // PyObject* drone_raw_time = PyTuple_GetItem(minimum_snap_result, 0);
-            //Call check_dynamic_limits
-            minimum_snap_check_dynamic = PyObject_GetAttrString(minimum_snap_instance, "check_dynamic_limits");
-            if (minimum_snap_check_dynamic && PyCallable_Check(minimum_snap_check_dynamic)){
-                args_check = Py_BuildValue("(00)", drone_raw_vel, drone_raw_acc);
-                result_check = PyObject_CallObject(minimum_snap_check_dynamic, args_check);
-
-                if (result_check){
-                    bool in_limit = PyObject_IsTrue(result_check);
-                    // Py_DECREF(pCheckResult);
-                }
-                else{
-                    PyErr_Print();
-                    std::cerr << "❌ Error calling check_dynamic_limits()\n";
-                }
-                Py_XDECREF(args_check);
-                Py_XDECREF(result_check);
-            }
-        Py_XDECREF(minimum_snap_instance); 
-        Py_XDECREF(minimum_snap_class);
-        Py_XDECREF(minimum_snap_generate);
-        Py_XDECREF(minimum_snap_check_dynamic);
-        }
-            
+    if (!pModule) {
+        PyErr_Print();
+        std::cerr << "❌ Failed to import Python module WaypointOptimization\n";
+        Py_Finalize();
+        return;
     }
-        // 🔚 Dọn dẹp
-    Py_XDECREF(minimum_snap_module);
-    Py_XDECREF(minimum_snap_name);
 
+    // ✅ Lấy class OptimizeWaypoints
+    PyObject* pClass = PyObject_GetAttrString(pModule, "OptimizeWaypoints");
+    if (!pClass || !PyCallable_Check(pClass)) {
+        std::cerr << "❌ Cannot find class OptimizeWaypoints in module\n";
+        Py_XDECREF(pClass);
+        Py_DECREF(pModule);
+        Py_Finalize();
+        return;
+    }
+
+    // ✅ Tạo instance của class
+    PyObject* pInstance = PyObject_CallObject(pClass, nullptr);
+    if (!pInstance) {
+        PyErr_Print();
+        std::cerr << "❌ Failed to instantiate OptimizeWaypoints\n";
+        Py_DECREF(pClass);
+        Py_DECREF(pModule);
+        Py_Finalize();
+        return;
+    }
+
+    // ✅ Gọi method generate_trajectory_from_csv
+    PyObject* pResult = PyObject_CallMethod(
+        pInstance,
+        "generate_trajectory_from_csv",
+        "(s)",
+        csv_to_optimize_waypoint.c_str()
+    );
+
+    if (!pResult) {
+        PyErr_Print();
+        std::cerr << "❌ Error calling generate_trajectory_from_csv()\n";
+        Py_DECREF(pInstance);
+        Py_DECREF(pClass);
+        Py_DECREF(pModule);
+        Py_Finalize();
+        return;
+    }
+
+    std::cout << "✅ Trajectory generated successfully.\n";
+
+    // ✅ Giải nén tuple (t, pos, vel, acc)
+    if (PyTuple_Check(pResult) && PyTuple_Size(pResult) >= 4) {
+        drone_raw_time = PyTuple_GetItem(pResult, 0);
+        drone_raw_pos  = PyTuple_GetItem(pResult, 1);
+        drone_raw_vel  = PyTuple_GetItem(pResult, 2);
+        drone_raw_acc  = PyTuple_GetItem(pResult, 3);
+
+        // Tăng ref vì PyTuple_GetItem không tự tăng
+        Py_INCREF(drone_raw_time);
+        Py_INCREF(drone_raw_pos);
+        Py_INCREF(drone_raw_vel);
+        Py_INCREF(drone_raw_acc);
+    } else {
+        std::cerr << "⚠️ Python returned invalid tuple.\n";
+    }
+
+    Py_DECREF(pResult);
+
+    // ✅ Gọi method check_dynamic_limits(vel, acc)
+    PyObject* pCheck = PyObject_CallMethod(pInstance, "check_dynamic_limits", "(OO)", drone_raw_vel, drone_raw_acc);
+    if (!pCheck) {
+        PyErr_Print();
+        std::cerr << "❌ Error calling check_dynamic_limits()\n";
+    } else {
+        bool in_limit = PyObject_IsTrue(pCheck);
+        std::cout << "📊 Dynamic check: " << (in_limit ? "OK" : "Out of limits") << std::endl;
+        Py_DECREF(pCheck);
+    }
+
+    // ✅ Dọn dẹp
+    Py_DECREF(pInstance);
+    Py_DECREF(pClass);
+    Py_DECREF(pModule);
     Py_Finalize();
+
+    optimize_flag = true;
 }
 
 void ProcessWaypointNode::main_loop() {
     if (recieved_rq)
     {
     pull_waypoint(csv_to_read_waypoint);
+    minimum_snap_python();
     // read_csv_file(csv_to_read_waypoint, csv_to_write_transfer_waypoint, org_lat_, org_long_, org_alt_);
     }
     else {return;}

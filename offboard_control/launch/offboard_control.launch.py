@@ -8,7 +8,8 @@ def generate_launch_description():
                               output="screen",
                               parameters=[{"csv_to_write_waypoint":"/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/waypoint_list.csv"},
                                           {"csv_to_read_waypoint": "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv"},
-                                          {"csv_to_write_transfer_waypoint": "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/waypoint_transfered_list.csv"}]
+                                          {"csv_to_write_transfer_waypoint": "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/waypoint_to_optimize.csv"}]
+
     )
     offboard_control = Node (package = "offboard_control",
                             executable="offboard_server_node",
@@ -27,4 +28,4 @@ def generate_launch_description():
     #                     name = "LoraDrone",
     #                     output = "screen"
     # )
-    return LaunchDescription([process_waypoint, offboard_control, drone_transformation])
+    return LaunchDescription([process_waypoint])#, offboard_control, drone_transformation])

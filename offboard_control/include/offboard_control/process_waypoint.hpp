@@ -50,7 +50,7 @@ class ProcessWaypointNode: public rclcpp::Node
     void pull_waypoint(const std::string& csv_to_read_path);
     void pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future);
     void waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg);
-    void minimum_snap();
+    void minimum_snap_python();
     void main_loop();
 
 
@@ -70,12 +70,14 @@ class ProcessWaypointNode: public rclcpp::Node
     bool get_org_pos;
     bool transfered_wp_flag = false;
     double org_lat_, org_long_, org_alt_;
+    bool optimize_flag;
 
     std::atomic<bool> got_first_;
     std::string csv_to_write_waypoint;
     std::string csv_to_read_waypoint;
     std::string csv_to_write_transfer_waypoint;
-  
+    std::string csv_to_optimize_waypoint;
+
     //Python declaration
     PyObject* minimum_snap_name;
     PyObject* minimum_snap_args;

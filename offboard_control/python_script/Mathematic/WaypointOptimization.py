@@ -12,6 +12,7 @@ from TrajectoryWaypoint import TrajectoryWaypoint
 class OptimizeWaypoints():
     def __init__(self):
         self.file_path = ""
+        print("✅ OptimizeWaypoints instance created!")
 
     def load_waypoints_from_csv(self, file_path):
         df = pd.read_csv(file_path)
@@ -20,11 +21,13 @@ class OptimizeWaypoints():
         #     position = np.array([row['x'], row['y'], row['z']])
         #     velocity = np.array([row['vx'], row['vy'], row['vz']])
         #     waypoints.append(TrajectoryWaypoint(position, velocity))
-        # return waypoints
+        # # return waypoints
+        # print("Number of waypoints found: ", waypoints)
         return df[['x', 'y', 'z']].to_numpy()
 
     def generate_trajectory_from_csv(self, csv_path, output_csv="minimum_snap_traj.csv", aggressiveness=1.0, sample_hz=1):
         #read input data
+        print(f"📂 Reading CSV file: LALALALALALALA")
         waypoints = self.load_waypoints_from_csv(csv_path)
         number_of_waypoints = len(waypoints)
         if number_of_waypoints < 2:
