@@ -1,18 +1,21 @@
-import pymap3d as pm
+#!/usr/bin/env python3
 
+import rclpy
+from rclpy.node import Node
+from mavros_msgs.srv import CommandBool, SetMode, CommandTOL
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import NavSatFix
+from mavros_msgs.msg import State
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+import time
+import csv
+import os
 
-e = 0.0
-n = 0.0
-u = 0.0
-# The local coordinate origin (Zermatt, Switzerland)
-lat0 = 11.052945 # deg
-lon0 = 106.6661470  # deg
-h0 = 0     # meters
+class PathPublish (Node):
+    def __init__(self):
+        super().__init__("PathPublishNode")
+        self.get_logger().info("Starting path publish node...")
 
-# The point of interest
-lat = 11.0529021000  # deg
-lon = 106.6662267000   # deg
-h = 7      # meters
+        self.publish_path = self.create_publisher()
 
-e, n, u = pm.geodetic2enu(lat, lon, h, lat0, lon0, h0)
-print(f"e is: {e}, n is {n}, u is {u}")
+(PoseStamped, '/mavros/setpoint_position/local', self.qos_profile_pub)

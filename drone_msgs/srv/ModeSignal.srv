@@ -5,6 +5,6 @@ uint8 OFFBOARD=1
 uint8 LAND=2
 ---
 # Response 
-bool sucess
+bool success
 string msg 
 

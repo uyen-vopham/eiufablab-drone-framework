@@ -15,7 +15,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(custom_msgs REQUIRED)
+find_package(drone_msgs REQUIRED)
 
 include_directories(include)
 
@@ -32,7 +32,7 @@ ament_target_dependencies(offboard_node
   visualization_msgs
   std_srvs
   tf2
-  custom_msgs
+  drone_msgs
 )
 target_include_directories(offboard_node
   PUBLIC 
@@ -54,7 +54,7 @@ ament_target_dependencies(offboard_server_node
   tf2
   visualization_msgs
   std_srvs
-  custom_msgs
+  drone_msgs
 )
  
 target_include_directories(offboard_server_node
@@ -85,7 +85,7 @@ ament_target_dependencies(process_waypoint_node
   visualization_msgs
   std_srvs
   tf2
-  custom_msgs
+  drone_msgs
   # GeographicLib
 )
 ################################################################ PROCESS WAYPOINT NODE

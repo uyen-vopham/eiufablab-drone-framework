@@ -76,7 +76,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
     //---------------Service Server--------------
     // service_ = this-> create_service <std_srvs::srv::SetBool>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
     // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
-    service_ = this-> create_service <custom_msgs::srv::ModeSignal>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
+    service_ = this-> create_service <drone_msgs::srv::ModeSignal>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
 
 
@@ -104,10 +104,10 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
 }
 
 
-void OffboardControl::service_callback(const std::shared_ptr<custom_msgs::srv::ModeSignal::Request> request,
-          std::shared_ptr<custom_msgs::srv::ModeSignal::Response>      response)
+void OffboardControl::service_callback(const std::shared_ptr<drone_msgs::srv::ModeSignal::Request> request,
+          std::shared_ptr<drone_msgs::srv::ModeSignal::Response>      response)
 {
-    if (request->mode == custom_msgs::srv::ModeSignal::Request::OFFBOARD)
+    if (request->mode == drone_msgs::srv::ModeSignal::Request::OFFBOARD)
     {response -> success = true;
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response ");
@@ -135,7 +135,7 @@ void OffboardControl::set_offboard_mode() {
     }
     auto request = std::make_shared<mavros_msgs::srv::SetMode::Request>();
     request->base_mode = 0;
-    request->custom_mode = "OFFBOARD";
+    request-> custom_mode = "OFFBOARD";
 
     auto future = set_mode_client_->async_send_request(request,
         std::bind(&OffboardControl::set_mode_callback, this, std::placeholders::_1));
@@ -331,7 +331,7 @@ void OffboardControl::landing(){
     }
     auto request_landing = std::make_shared<mavros_msgs::srv::SetMode::Request>();
     request_landing->base_mode = 0;
-    request_landing->custom_mode = "AUTO.LAND";
+    request_landing-> custom_mode = "AUTO.LAND";
     // landing_automode = true;
 
     auto landing_future = landing_client_->async_send_request(request_landing,
@@ -448,7 +448,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<OffboardControl>();
 
-    // Instead of spin, use a custom executor
+    // Instead of spin, use a drone executor
     rclcpp::executors::MultiThreadedExecutor exec;
     exec.add_node(node);
     exec.spin();

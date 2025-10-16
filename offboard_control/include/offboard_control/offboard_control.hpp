@@ -25,7 +25,7 @@
 #include "mavros_msgs/srv/command_bool.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
 #include "mavros_msgs/srv/waypoint_pull.hpp"
-#include "custom_msgs/srv/mode_signal.hpp"
+#include "drone_msgs/srv/mode_signal.hpp"
 
 // #include "offboard_control/offboard_control.hpp"
 
@@ -58,8 +58,8 @@ private:
     void disarm_cb(rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedFuture future);
     void landing();
     void landing_cb(rclcpp::Client<mavros_msgs::srv::SetMode>::SharedFuture future);
-    void service_callback(const std::shared_ptr<custom_msgs::srv::ModeSignal::Request> request,
-          std::shared_ptr<custom_msgs::srv::ModeSignal::Response>      response);
+    void service_callback(const std::shared_ptr<drone_msgs::srv::ModeSignal::Request> request,
+          std::shared_ptr<drone_msgs::srv::ModeSignal::Response>      response);
     // void service_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     //       std::shared_ptr<std_srvs::srv::SetBool::Response>      response);
     void follow_trajectory(const std::string& csv_to_read_path);
@@ -93,7 +93,7 @@ private:
     rclcpp::Client<mavros_msgs::srv::SetMode>::SharedPtr landing_client_;
     rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr process_wp_client_;
     rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedPtr pull_waypoint_client_;
-    rclcpp::Service<custom_msgs::srv::ModeSignal>::SharedPtr service_;
+    rclcpp::Service<drone_msgs::srv::ModeSignal>::SharedPtr service_;
     // rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_;
     rclcpp::CallbackGroup::SharedPtr callback_group_;
     rclcpp::SubscriptionOptions subscription_options_;
