@@ -25,7 +25,7 @@ class OptimizeWaypoints():
         # print("Number of waypoints found: ", waypoints)
         return df[['x', 'y', 'z']].to_numpy()
 
-    def generate_trajectory_from_csv(self, csv_path, output_csv="minimum_snap_traj.csv", aggressiveness=1.0, sample_hz=1):
+    def generate_trajectory_from_csv(self, csv_path, output_csv, aggressiveness=1.0, sample_hz=1):
         #read input data
         print(f"📂 Reading CSV file: LALALALALALALA")
         waypoints = self.load_waypoints_from_csv(csv_path)

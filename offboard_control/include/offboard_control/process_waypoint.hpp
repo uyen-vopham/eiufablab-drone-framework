@@ -77,6 +77,9 @@ class ProcessWaypointNode: public rclcpp::Node
     std::string csv_to_read_waypoint;
     std::string csv_to_write_transfer_waypoint;
     std::string csv_to_optimize_waypoint;
+    std::vector<double> waypoints_GPS;
+    std::vector<double> waypoints_ENU;
+    std::vector<double> waypoint_optimize;
 
     //Python declaration
     PyObject* drone_raw_time;

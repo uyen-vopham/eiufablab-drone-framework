@@ -15,15 +15,16 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     //------------Declare parameters------
     this->declare_parameter<std::string>("csv_to_write_waypoint");
     this->declare_parameter<std::string>("csv_to_write_transfer_waypoint");
-    this->declare_parameter<std::string>("csv_to_read_waypoint");
+    // this->declare_parameter<std::string>("csv_to_read_waypoint");
     // this->declare_parameter<std::string>("csv_to_optimize_waypoint");
 
     //------------Get parameters----------
     this -> csv_to_write_waypoint = this->get_parameter("csv_to_write_waypoint").as_string();
     this -> csv_to_write_transfer_waypoint = this->get_parameter("csv_to_write_transfer_waypoint").as_string();
-    this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
+    // this -> csv_to_read_waypoint = this->get_parameter("csv_to_read_waypoint").as_string();
     // this -> csv_to_optimize_waypoint = this->get_parameter("csv_to_optimize_waypoint").as_string();
-    csv_to_optimize_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/python_script/Mathematic/waypoints.csv";
+    csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/waypoint_transfered_list.csv";
+    csv_to_optimize_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
     // csv_to_read_waypoint = csv_to_write_waypoint;
     // csv_to_read_waypoint = "/home/uyen/Drone/drone_ws/src/offboard_control/src/csv_files/minimum_snap_traj.csv";
     //------------QoS---------------------------
@@ -40,7 +41,7 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
     
     //---------------Service Server--------------
-    service_ = this-> create_service <std_srvs::srv::SetBool>("process_waypoint_service", 
+    service_ = this-> create_service <std_srvs::srv::SetBool>("/offboard_control/process_waypoint_service", 
                     std::bind(&ProcessWaypointNode::service_callback, this, _1, _2)
                     , rmw_qos_profile_services_default,callback_group_);
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
@@ -56,10 +57,10 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
     );
    
     //---------------Suscribe topics-------------
-    // waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
-    //     "/offboard_waypoint_list", qos_waypoint,
-    //     std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
-    // );
+    waypoint_sub_ = this->create_subscription<mavros_msgs::msg::WaypointList>(
+        "/offboard_control/waypoints", qos_waypoint,
+        std::bind(&ProcessWaypointNode::waypoint_cb, this, _1)
+    );
 
     org_position_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
       "mavros/global_position/global",
@@ -106,6 +107,7 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
                        mavros_msgs::msg::PositionTarget::IGNORE_AFY |
                        mavros_msgs::msg::PositionTarget::IGNORE_AFZ |
                        mavros_msgs::msg::PositionTarget::FORCE);
+    
 
 }
 
@@ -289,7 +291,7 @@ void ProcessWaypointNode::minimum_snap_python(){
     //     csv_to_optimize_waypoint.end()
     // );
 
-    std::cout << "📂 CSV path (clean): " << csv_to_optimize_waypoint << std::endl;
+    std::cout << "📂 CSV path (clean): " << csv_to_read_waypoint << std::endl;
 
     // ✅ Khởi tạo Python interpreter (chỉ nên gọi 1 lần cho node, nhưng tạm thời giữ nguyên)
     Py_Initialize();
@@ -333,7 +335,8 @@ void ProcessWaypointNode::minimum_snap_python(){
     PyObject* pResult = PyObject_CallMethod(
         pInstance,
         "generate_trajectory_from_csv",
-        "(s)",
+        "(ss)",
+        csv_to_read_waypoint.c_str(),
         csv_to_optimize_waypoint.c_str()
     );
 

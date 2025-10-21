@@ -57,7 +57,7 @@ class LoraDrone(Node):
         self.subscription_global_position = self.create_subscription(NavSatFix, '/mavros/global_position/global', self.global_position_callback, qos_profile)
         self.subscription_battery = self.create_subscription(BatteryState, '/mavros/battery', self.battery_cb, qos_profile)
         self.subscription_speed = self.create_subscription(TwistStamped, '/mavros/local_position/velocity_local', self.velocity_cb, qos_profile)  
-        self.mission_pub = self.create_publisher(WaypointList, '/offboard_waypoint_list', qos_pub) 
+        self.mission_pub = self.create_publisher(WaypointList, '/offboard_control/waypoints', qos_pub) 
         
        
         self.mode_client = self.create_client(ModeSignal, '/offboard_service') 
@@ -264,4 +264,4 @@ def main(args=None):
 
 
 if __name__ == '__main__':
-    main()
+    main() 
