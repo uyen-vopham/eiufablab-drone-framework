@@ -56,8 +56,8 @@ class PubWpToPath(Node):
             wp.command = 16 #MAV_CMD_NAV_WAYPOINT
             wp.is_current = (i == 0)
             wp.autocontinue = True
-            wp.x_lat = 10.8700 + 0.0001 * i
-            wp.y_long = 106.8000 + 0.0001 * i
+            wp.x_lat = 11.052940 + 0.0001 * i
+            wp.y_long = 106.666112 + 0.0001 * i
             wp.z_alt = 7.0
             waypoints.append(wp)
         msg = WaypointList()

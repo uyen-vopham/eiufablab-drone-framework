@@ -43,14 +43,10 @@ class ProcessWaypointNode: public rclcpp::Node
     ProcessWaypointNode();
     void service_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
           std::shared_ptr<std_srvs::srv::SetBool::Response>  response);
-    void read_csv_file (const std::string& csv_to_read_path, const std::string& csv_to_write_path, const float& lat0, 
-                        const float& long0, const float& alt0);
-    std::string convertGPS2ENU_function(double lat0, double long0, double alt0, std::vector<double> line);
     void write_csv_file(const std::string& csv_path_to_write, std::string& line);
-    void pull_waypoint(const std::string& csv_to_read_path);
-    void pull_waypoint_cb(rclcpp::Client<mavros_msgs::srv::WaypointPull>::SharedFuture future);
     void waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg);
     void minimum_snap_python();
+    void push_waypoint();
     void main_loop();
 
 
@@ -70,6 +66,7 @@ class ProcessWaypointNode: public rclcpp::Node
     bool get_org_pos;
     bool transfered_wp_flag = false;
     double org_lat_, org_long_, org_alt_;
+    bool recieve_wp;
     bool optimize_flag;
 
     std::atomic<bool> got_first_;
@@ -77,9 +74,10 @@ class ProcessWaypointNode: public rclcpp::Node
     std::string csv_to_read_waypoint;
     std::string csv_to_write_transfer_waypoint;
     std::string csv_to_optimize_waypoint;
-    std::vector<double> waypoints_GPS;
-    std::vector<double> waypoints_ENU;
-    std::vector<double> waypoint_optimize;
+    std::vector<std::vector<double>> waypoints_GPS;
+    
+    std::vector<std::vector<double>> waypoints_ENU;
+    std::vector<std::vector<double>> waypoint_optimize;
 
     //Python declaration
     PyObject* drone_raw_time;

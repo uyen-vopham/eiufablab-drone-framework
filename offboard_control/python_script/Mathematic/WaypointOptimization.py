@@ -25,10 +25,10 @@ class OptimizeWaypoints():
         # print("Number of waypoints found: ", waypoints)
         return df[['x', 'y', 'z']].to_numpy()
 
-    def generate_trajectory_from_csv(self, csv_path, output_csv, aggressiveness=1.0, sample_hz=1):
+    def generate_trajectory_from_csv(self, waypoints_list, output_csv, aggressiveness=1.0, sample_hz=1):
         #read input data
-        print(f"📂 Reading CSV file: LALALALALALALA")
-        waypoints = self.load_waypoints_from_csv(csv_path)
+        # print(f"📂 Reading CSV file: LALALALALALALA")
+        waypoints = waypoints_list
         number_of_waypoints = len(waypoints)
         if number_of_waypoints < 2:
             raise ValueError("Need at least two waypoints to generate a trajectory.")
@@ -56,9 +56,9 @@ class OptimizeWaypoints():
         # Save to CSV
         output_data = pd.DataFrame({
             'time': t,
-            'x': pos[:, 0], 'y': pos[:, 1], 'z': pos[:, 2]
-            # 'dx': vel[:, 0], 'dy': vel[:, 1], 'dz': vel[:, 2],
-            # 'ddx': acc[:, 0], 'ddy': acc[:, 1], 'ddz': acc[:, 2]
+            'x': pos[:, 0], 'y': pos[:, 1], 'z': pos[:, 2],
+            'dx': vel[:, 0], 'dy': vel[:, 1], 'dz': vel[:, 2],
+            'ddx': acc[:, 0], 'ddy': acc[:, 1], 'ddz': acc[:, 2]
         })
         output_data.to_csv(output_csv, index=False)
         print(f"Trajectory saved to {output_csv}")
@@ -78,7 +78,7 @@ class OptimizeWaypoints():
 
         return t, pos, vel, acc
 
-    def check_dynamic_limits(self, vel, acc, vmax=2.0, amax=2.0):
+    def check_dynamic_limits(self, vel, acc, vmax=4.0, amax=4.0):
         
         v_norm = np.linalg.norm(vel, axis=1)
         a_norm = np.linalg.norm(acc, axis=1)
@@ -95,12 +95,20 @@ class OptimizeWaypoints():
             print("🚨 Cảnh báo: Vượt giới hạn gia tốc!")
 
         return (v_max_measured <= vmax) and (a_max_measured <= amax)
+# 
 
 # if __name__ == "__main__":
 
-#     path_csv = "waypoints.csv"
-#     optimization = OptimizeWaypoint()
-#     t, pos, vel, acc = optimization.generate_trajectory_from_csv(path_csv)
+#     output_csv = "waypoints.csv"
+#     path_csv = [[-2.25058e-11, -0.0110615, 7],[10.9268, 11.0505, 6.99998],[21.8536, 22.112, 6.99992],[32.7804, 33.1735, 6.99983],[32.7804, 33.1735, 6.99983 ],
+# [43.7072, 44.2351, 6.9997],[54.634, 55.2966, 6.99952],[54.634, 55.2966, 6.99952],[65.5607, 66.3581, 6.99932],
+# [76.4875, 77.4197, 6.99907],[87.4143, 88.4812, 6.99878],[98.341, 99.5428,6.99846],[109.268, 110.604, 6.9981 ],
+# [120.194, 121.666, 6.9977],[120.194, 121.666, 6.9977],[131.121, 132.727, 6.99726],[142.048, 143.789, 6.99679],
+# [152.975, 154.851, 6.99627],[163.901, 165.912, 6.99572]] 
+
+#     waypoints = np.array(path_csv)
+#     optimization = OptimizeWaypoints()
+#     t, pos, vel, acc = optimization.generate_trajectory_from_csv(waypoints,output_csv)
 #     check_dynamic = optimization.check_dynamic_limits(vel, acc)
 #     if not check_dynamic:
 #         print("Trajectory exceeds dynamic limits. Please adjust waypoints or aggressiveness.")

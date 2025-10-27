@@ -8,6 +8,7 @@ ProcessWaypointNode :: ProcessWaypointNode (): Node("process_waypoint"), recieve
                                                                         response_sig(false),
                                                                         write_transfer_wp_flag(false),
                                                                         transfered_wp_flag(false),
+                                                                        recieve_wp(false),
                                                                         optimize_flag(false)
                                                                         
 {
@@ -107,191 +108,47 @@ void ProcessWaypointNode::service_callback(const std::shared_ptr<std_srvs::srv::
                        mavros_msgs::msg::PositionTarget::IGNORE_AFY |
                        mavros_msgs::msg::PositionTarget::IGNORE_AFZ |
                        mavros_msgs::msg::PositionTarget::FORCE);
-    
-
+    if (request->data == true)
+    {     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Request to Process waypoint server recieved");
+    if (optimize_flag)
+    {response -> success = true;
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Sending back response from Process waypoint server");
+    }}
+    else
+    {RCLCPP_INFO(this->get_logger(), "❗REQUEST RECEIVE, BUT NOT OFFBOARD MODE");}
 }
 
 
 
 void ProcessWaypointNode::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg){
     // RCLCPP_INFO(this->get_logger(), "Received %ld waypoints", msg->waypoints.size());
+    if (recieve_wp){return;}
     RCLCPP_INFO(this->get_logger(), "YOU ARE IN WAYPOINT CALLBACK");
     RCLCPP_INFO(this->get_logger(),
         "Got %zu waypoints, current waypoint seq: %u",
         msg->waypoints.size(), msg->current_seq);
 
-    // RCLCPP_INFO(this->get_logger(),  "WP are %.9d", msg->waypoints);
-    std::cout<<csv_to_write_waypoint<<std::endl;
-    std::ofstream file (csv_to_write_waypoint, std::ios::trunc);
-    if (!file.is_open()){
-        RCLCPP_ERROR(this->get_logger(), "❌ Cannot open waypoints_log.csv");
-        return;
-    }
-    if (file.is_open()){RCLCPP_INFO(this->get_logger(), "FILE IS OPENEDDDDDDDDDDDDDDDD");}
-    // std::string name = "uyen";
-    // int age = 29;
-    // file << name << "," << age << "\n";
-    for (size_t i = 0; i < msg->waypoints.size(); i++)
-    {
+    for (int i = 0; i < msg->waypoints.size(); i ++){
         const auto &wp = msg->waypoints[i];
-        RCLCPP_INFO(this->get_logger(),
-            "WP[%zu] frame=%d command=%d is_current=%d "
-            "lat=%.9f lon=%.9f alt=%.9f",
-            i,
-            wp.frame,
-            wp.command,
-            wp.is_current,
-            wp.x_lat,
-            wp.y_long,
-            wp.z_alt
-        );
-        file << std::fixed << std::setprecision(10)
-            << wp.x_lat << ","
-            << wp.y_long << ","
-            << wp.z_alt << "\n";
+        waypoints_GPS.push_back({wp.x_lat, wp.y_long, wp.z_alt});
     }
-    file.close();
-    std::cout << "✅ CSV written successfully.\n";
+
+    GeographicLib::LocalCartesian proj(org_lat_, org_long_, org_alt_);  // khởi tạo hệ ENU
+
+    for (const auto &gps_point : waypoints_GPS){
+        double x,y,z;
+        proj.Forward(gps_point[0], gps_point[1], gps_point[2], x, y, z);
+        waypoints_ENU.push_back({x,y,z});
+    }
+   
+    recieve_wp = true;
     return;
-}
 
-std::string ProcessWaypointNode::convertGPS2ENU_function (double lat0, double long0, double alt0, 
-                std::vector<double> line){
-    //  double lat0 = 11.052945, lon0 = 106.6661470, alt0 = 0;     // gốc local
-    // double lat = 11.0529021, lon = 106.6662267, alt = 7.0;     // target GPS
-
-    GeographicLib::LocalCartesian proj(lat0, long0, alt0);  // khởi tạo hệ ENU
-
-    double x, y, z;
-    proj.Forward(line[0], line[1], line[2], x, y, z);   // GPS → ENU
-
-    // std::cout << "x (East): " << x << ", y (North): " << y << ", z (Up): " << z << std::endl;
-    std::stringstream oss;
-    oss << std::fixed << std::setprecision(7)
-    << x << "," << y << "," << z;
-    return oss.str();
-}
-
-void ProcessWaypointNode::read_csv_file (const std::string& csv_to_read_path, const std::string& csv_to_write_path,
-    const float& lat0, const float& long0, const float& alt0)
-{
-    if (write_transfer_wp_flag){return;}
-    std::ifstream file (csv_to_read_path);
-    std::cout<<csv_to_read_path<<std::endl;
-    if (!file.is_open()){
-        std::cout<<"ERROR: Can not open csv file"<< std::endl;
-        // RCLCPP_ERROR(this->get_logger(), "❌ Cannot open waypoints_log.csv");
-        return;
-    }
-    if (file.is_open()){
-        std::cout<<"INFO: CSV file is open, and ready to transfer."<<std::endl;}
-    
-    std::string line;
-    while(std::getline(file, line))
-    {
-        std::stringstream single_stream_(line);
-        std::string token;
-        // std::getline(single_stream_, token, ',');  // đọc và bỏ token đầu (index)
-        std::vector<double> values;
-        while(std::getline(single_stream_, token, ','))
-        {
-            values.push_back(std::stod(token));
-            // std::cout << token << std::endl;
-        }
-        auto convert_values = convertGPS2ENU_function(lat0, long0, alt0, values);
-        std::cout << convert_values << std::endl;
-        // std::cout << values[1] << std::endl;
-        // std::cout << values[2] << std::endl;
-        write_csv_file(csv_to_write_path, convert_values);
-        
-        std::cout<<std::endl;
-    }   
-    file.close();
-    write_transfer_wp_flag=true;
-}
-
-void ProcessWaypointNode::write_csv_file(const std::string& csv_path_to_write, std::string& line)
-{
-    //  std::cout << line << std::endl;
-    // int order;
-    // float X, Y, Z;
-    // order = line[0];
-    // X = line[1];
-    // Y = line[2];
-    // Z = line[3];
-  
-    std::ofstream file (csv_path_to_write, std::ios::app);
-    if (!file.is_open()){
-        std::cout<<"ERROR: Can not open convert_waypoint_log.csv file"<<std::endl;
-        return;
-    }
-    if (file.is_open()){std::cout<<"INFO: CSV file is open, and ready to write."<<std::endl;}
-    // file <<"Order, Latitude, Longitude, Altitude\n";
-    file << line << "\n";
-    file.close();
-    std::cout << "✅ CSV written successfully.\n";
-    return;
-}
-
-void ProcessWaypointNode::pull_waypoint(const std::string& csv_to_read_path)
-{
-    if (transfered_wp_flag) { return; }
-
-    std::ifstream file(csv_to_read_path);
-    std::cout << csv_to_read_path << std::endl;
-
-    if (!file.is_open()) {
-        std::cout << "ERROR: Cannot open csv file" << std::endl;
-        return;
-    }
-
-    std::cout << "INFO: CSV file is open, and ready to transfer." << std::endl;
-
-    // ✅ Preview file content
-    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    std::cout << "🧾 File content preview:\n" << content.substr(0, 200) << std::endl;
-
-    // 👉 Reset lại luồng để đọc lại từ đầu
-    file.clear();  // clear EOF flag
-    file.seekg(0, std::ios::beg);
-
-    std::string line;
-    int line_count = 0;
-
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        line_count++;
-
-        std::stringstream ss(line);
-        std::string token;
-        std::vector<double> values;
-
-        while (std::getline(ss, token, ',')) {
-            try {
-                values.push_back(std::stod(token));
-            } catch (...) {
-                // có thể dòng đầu là header, bỏ qua
-            }
-        }
-    }
-
-    std::cout << "📄 Tổng số hàng (waypoints) trong CSV: " << line_count << std::endl;
-    transfered_wp_flag = true;
-    
 }
 
 // create a function that used for call python script that calculate minimum snap trajectory for optimizing waypoints
 void ProcessWaypointNode::minimum_snap_python(){
     if (optimize_flag) return;
-
-    // ✅ Làm sạch đường dẫn trước (xóa ký tự ẩn hoặc không in được)
-    // csv_to_optimize_waypoint.erase(
-    //     std::remove_if(csv_to_optimize_waypoint.begin(), csv_to_optimize_waypoint.end(),
-    //         [](unsigned char c){ return c < 32 || c == 0x9B || c == 0xA0; }),
-    //     csv_to_optimize_waypoint.end()
-    // );
-
-    std::cout << "📂 CSV path (clean): " << csv_to_read_waypoint << std::endl;
 
     // ✅ Khởi tạo Python interpreter (chỉ nên gọi 1 lần cho node, nhưng tạm thời giữ nguyên)
     Py_Initialize();
@@ -332,11 +189,21 @@ void ProcessWaypointNode::minimum_snap_python(){
     }
 
     // ✅ Gọi method generate_trajectory_from_csv
+    PyObject* pyList = PyList_New(waypoints_ENU.size());
+    for (size_t i = 0; i < waypoints_ENU.size(); i ++){
+        PyObject* innerList = PyList_New(3);
+        PyList_SetItem(innerList, 0, PyFloat_FromDouble(waypoints_ENU[i][0]));
+        PyList_SetItem(innerList, 1, PyFloat_FromDouble(waypoints_ENU[i][1]));
+        PyList_SetItem(innerList, 2, PyFloat_FromDouble(waypoints_ENU[i][2]));
+
+        // send inner to pylist
+        PyList_SetItem(pyList, i, innerList);
+    }
     PyObject* pResult = PyObject_CallMethod(
         pInstance,
         "generate_trajectory_from_csv",
-        "(ss)",
-        csv_to_read_waypoint.c_str(),
+        "(Os)",
+        pyList,
         csv_to_optimize_waypoint.c_str()
     );
 
@@ -388,14 +255,18 @@ void ProcessWaypointNode::minimum_snap_python(){
     Py_Finalize();
 
     optimize_flag = true;
+    push_waypoint();
+    return;
 }
 
+void ProcessWaypointNode::push_waypoint(){
+    
+
+}
 void ProcessWaypointNode::main_loop() {
-    if (recieved_rq)
+    if (recieved_rq && recieve_wp)
     {
-    pull_waypoint(csv_to_read_waypoint);
     minimum_snap_python();
-    // read_csv_file(csv_to_read_waypoint, csv_to_write_transfer_waypoint, org_lat_, org_long_, org_alt_);
     }
     else {return;}
    
