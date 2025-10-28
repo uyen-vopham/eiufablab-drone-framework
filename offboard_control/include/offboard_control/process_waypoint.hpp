@@ -12,6 +12,7 @@
 
 
 #include "python3.10/Python.h"
+#include "numpy/arrayobject.h"
 
 
 #include "rclcpp/rclcpp.hpp"
@@ -41,6 +42,7 @@ class ProcessWaypointNode: public rclcpp::Node
 {
     public:
     ProcessWaypointNode();
+    
     void service_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
           std::shared_ptr<std_srvs::srv::SetBool::Response>  response);
     void write_csv_file(const std::string& csv_path_to_write, std::string& line);

@@ -16,6 +16,7 @@ find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(drone_msgs REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 include_directories(include)
 
@@ -66,15 +67,25 @@ target_include_directories(offboard_server_node
 
 
 ################################################################ PROCESS WAYPOINT NODE
+
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.get_include())"
+    OUTPUT_VARIABLE NumPy_INCLUDE_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 add_executable(process_waypoint_node
   src/process_waypoint.cpp
 )
-target_link_libraries(process_waypoint_node Geographic)
+
+target_link_libraries(process_waypoint_node Geographic ${Python3_LIBRARIES})
 
 target_include_directories(process_waypoint_node
   PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:include>
+  ${NumPy_INCLUDE_DIR}
+  ${Python3_INCLUDE_DIRS})
 
 ament_target_dependencies(process_waypoint_node
   rclcpp

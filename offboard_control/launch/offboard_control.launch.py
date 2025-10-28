@@ -28,4 +28,4 @@ def generate_launch_description():
     #                     name = "LoraDrone",
     #                     output = "screen"
     # )
-    return LaunchDescription([process_waypoint])#, offboard_control, drone_transformation])
+    return LaunchDescription([process_waypoint, offboard_control])#, drone_transformation])

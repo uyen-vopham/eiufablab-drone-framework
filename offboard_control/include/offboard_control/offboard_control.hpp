@@ -53,7 +53,6 @@ private:
     void takeoff();
     void go_ahead();
     void waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg);
-    void log_position();
     void disarm();
     void disarm_cb(rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedFuture future);
     void landing();

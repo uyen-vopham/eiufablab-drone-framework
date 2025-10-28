@@ -76,7 +76,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
     //---------------Service Server--------------
     // service_ = this-> create_service <std_srvs::srv::SetBool>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
     // RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
-    service_ = this-> create_service <drone_msgs::srv::ModeSignal>("offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
+    service_ = this-> create_service <drone_msgs::srv::ModeSignal>("offboard_control/offboard_service", std::bind(&OffboardControl::service_callback, this, _1, _2), rmw_qos_profile_services_default,callback_group_);
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Ready to send response");
 
 
@@ -88,7 +88,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
     //landing client
     landing_client_ = this->create_client<mavros_msgs::srv::SetMode>("mavros/set_mode");
     //process waypoint client
-    process_wp_client_ = this->create_client<std_srvs::srv::SetBool>("process_waypoint_service");
+    process_wp_client_ = this->create_client<std_srvs::srv::SetBool>("offboard_control/process_waypoint_service");
 
     
     //--------------------Timer callback----------------
@@ -98,9 +98,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
     );
 
     //--------------Initial other functions-----------------
-    timer_csv = this->create_wall_timer(std::chrono::milliseconds(100), 
-                                        std::bind(&OffboardControl::log_position, this));
-    csv_start_ = this->now();
+   
 }
 
 
@@ -118,11 +116,6 @@ void OffboardControl::service_callback(const std::shared_ptr<drone_msgs::srv::Mo
     else
     {RCLCPP_INFO(this->get_logger(), "❗REQUEST RECEIVE, BUT NOT OFFBOARD MODE");}
 }
-
-// void OffboardControl::waypoint_cb(const mavros_msgs::msg::WaypointList::SharedPtr msg){
-//     waypoint_list = *msg;
-//     RCLCPP_INFO(this->get_logger(), "WAYPOINT LIST RECEIVED", waypoint_list.waypoints);
-// }
 
 void OffboardControl::set_offboard_mode() {
     if (offboard_mode_ || current_state_.mode == "OFFBOARD") {
@@ -384,7 +377,8 @@ void OffboardControl::main_loop() {
 
     if (!landing_flag_ && takeoff_flag){
         process_wp();
-        set_offboard_mode();
+        if (process_srv_flag)
+        {set_offboard_mode();}
         // if (current_state_.mode == "OFFBOARD" && offboard_mode_) {
         // RCLCPP_INFO(this->get_logger(), "Waiting for OFFBOARD mode...");
         // return;
@@ -418,31 +412,6 @@ void OffboardControl::main_loop() {
         }
     }
 }
-
-void OffboardControl::log_position(){
-    double elapsed_time = (this->now() - csv_start_).seconds();
-    try
-    {
-        std::ofstream file("drone_log_position.csv", std::ios::app);
-        if (!file.is_open())
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to open CSV file: %s", "drone_log_position.csv" );
-            return;
-        }
-
-        file << std::fixed << std::setprecision(2)
-             << elapsed_time << ","
-             << current_x_ << ","
-             << current_y_ << ","
-             << current_z_ << "\n";
-        file.close();
-    }
-    catch (const std::exception &e)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to write to CSV: %s", e.what());
-    }
-}
-
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
