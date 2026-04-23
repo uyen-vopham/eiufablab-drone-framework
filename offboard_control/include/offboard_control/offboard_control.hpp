@@ -73,7 +73,7 @@ private:
     mavros_msgs::msg::State current_state_;
     double current_x_, current_y_, current_z_, takeoff_height_;
     double current_lat_, current_long_, current_alt_;
-    bool takeoff_flag, go_ahead_flag, offboard_flag=true, hover_flag=false;
+    bool takeoff_flag, go_ahead_flag, offboard_flag=true, hover_flag=false, offboardmode_qgc;
     bool check_armed_, check_landed_, reach_attitude_;
     bool landing_flag_, offboard_mode_;
     bool landing_started_, delay_started_;

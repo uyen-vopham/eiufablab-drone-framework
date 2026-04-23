@@ -10,6 +10,7 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
                                                               reach_attitude_(false),
                                                               landing_flag_(false),
                                                               offboard_mode_(false),
+                                                              offboardmode_qgc(false),
                                                               pull_waypoint_srv_flag(false),
                                                               process_srv_flag(false),
                                                               takeoff_start_time_(this->now()),
@@ -26,9 +27,9 @@ OffboardControl::OffboardControl(): Node("offboard_control_server"),
 
     //-------------QoS setting for different topics-------
     //----DRONE STATE
-    rclcpp::QoS qos_state(rclcpp::KeepLast(10));
-    qos_state.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-    qos_state.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
+    rclcpp::QoS qos_state(rclcpp::KeepLast(1));
+    qos_state.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+    qos_state.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
     //----DRONE POSE
     rclcpp::QoS qos_pose(rclcpp::KeepLast(10));
     qos_pose.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
@@ -152,22 +153,26 @@ void OffboardControl::state_cb(const mavros_msgs::msg::State msg) {
     current_state_ = msg;  //SharedPtr là con trỏ, current_state_ là 1 biến bình thường, và đã có địa chỉ
                             //Để gán giá trị msg vào biến current_state_, thì phải thêm * vào msg để lấy giá trị của biến địa chỉ msg
     last_state_time_=this->now();
-    if (current_state_.mode == "OFFBOARD" && offboard_flag)
+    // RCLCPP_INFO(this->get_logger(), "Current mode: %s", current_state_.mode);
+    if (current_state_.mode == "OFFBOARD")
     {
         // arm_drone();
         RCLCPP_INFO(this->get_logger(), "OFFBOARD MODE");
+        offboardmode_qgc = true;
+
         // takeoff_flag = true;
         // RCLCPP_INFO(this->get_logger(), "CURRENT Z IS %f", current_z_);
         landing_flag_=false;
+
     }
     if (current_state_.mode == "AUTO.LAND"){
         landing_flag_ = true;
-        offboard_flag = false;
+        offboardmode_qgc = false;
         RCLCPP_INFO(this->get_logger(), "AUTO.LAND MODE");
     }
     
     if (current_state_.mode == "STABILIZED"){
-        offboard_flag = true;
+        RCLCPP_INFO(this->get_logger(), "STABILIZED MODE");
     }
 }
 
@@ -373,10 +378,10 @@ void OffboardControl::main_loop() {
         return;
     }
 
-    /////////////////////////////////////
 
-    if (!landing_flag_ && takeoff_flag){
-        process_wp();
+
+    if (!landing_flag_ && takeoff_flag && offboardmode_qgc){
+        //process_wp();
         if (process_srv_flag)
         {set_offboard_mode();}
         // if (current_state_.mode == "OFFBOARD" && offboard_mode_) {
